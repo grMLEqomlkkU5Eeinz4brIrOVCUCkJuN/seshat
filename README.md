@@ -1,6 +1,6 @@
 # Seshat Trie
 
-![Seshat](@seshat.png)
+![Seshat](./docs/assets/seshat.png)
 
 Image source: [Wikipedia — Seshat](https://en.wikipedia.org/wiki/Seshat)
 
