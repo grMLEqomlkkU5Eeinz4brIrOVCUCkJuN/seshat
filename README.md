@@ -1,6 +1,6 @@
 # Seshat Trie
 
-![Seshat](https://en.wikipedia.org/wiki/File:Hatshepsut_and_Seshat.jpg)
+![Seshat](https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Hatshepsut_and_Seshat.jpg/960px-Hatshepsut_and_Seshat.jpg)
 
 Image source: [Wikipedia — Seshat](https://en.wikipedia.org/wiki/Seshat)
 
