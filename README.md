@@ -14,6 +14,25 @@ Prerequisites: a working C/C++ toolchain for `node-gyp` (Python, make, compiler)
 npm install seshat
 ```
 
+### OS prerequisites for local compilation
+
+- Linux
+  - Python 3, make, C/C++ compiler and headers
+  - Debian/Ubuntu: `sudo apt-get install -y build-essential python3`
+  - Fedora/RHEL: `sudo dnf install -y @development-tools python3`
+  - Arch: `sudo pacman -S --needed base-devel python`
+
+- macOS
+  - Xcode Command Line Tools and Python 3
+  - Install: `xcode-select --install` and `brew install python`
+
+- Windows
+  - Visual Studio Build Tools (workload: Desktop development with C++) and Python 3
+  - Python: `winget install Python.Python.3.11` or download from python.org
+  - If multiple VS versions are installed: `npm config set msvs_version 2019` (or 2022)
+
+Supported Node versions: Node 18, 20, or 22 (see `engines` field). `npm install` will build the native addon locally via node-gyp.
+
 ## Quick start
 
 ```ts
