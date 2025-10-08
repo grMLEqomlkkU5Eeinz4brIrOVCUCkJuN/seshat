@@ -12,7 +12,7 @@ Napi::Object Seshat::Init(Napi::Env env, Napi::Object exports) {
 		{InstanceMethod("insert", &Seshat::Insert),
 		 InstanceMethod("insertBatch", &Seshat::InsertBatch),
 		 InstanceMethod("insertFromFile", &Seshat::InsertFromFile),
-         InstanceMethod("insertFromFileAsync", &Seshat::InsertFromFileAsync),
+		 InstanceMethod("insertFromFileAsync", &Seshat::InsertFromFileAsync),
 		 InstanceMethod("search", &Seshat::Search),
 		 InstanceMethod("searchBatch", &Seshat::SearchBatch),
 		 InstanceMethod("startsWith", &Seshat::StartsWith),
@@ -292,69 +292,76 @@ Napi::Value Seshat::InsertFromFile(const Napi::CallbackInfo &info) {
 // Async worker for insertFromFile
 class InsertFromFileWorker : public Napi::AsyncWorker {
   public:
-    InsertFromFileWorker(Seshat *instance, std::string filePath,
-                         size_t bufferSize, Napi::Function &callback)
-        : Napi::AsyncWorker(callback), instance_(instance),
-          filePath_(std::move(filePath)), bufferSize_(bufferSize),
-          wordsInserted_(0) {}
+	InsertFromFileWorker(Seshat *instance, std::string filePath,
+						 size_t bufferSize, Napi::Function &callback)
+		: Napi::AsyncWorker(callback), instance_(instance),
+		  filePath_(std::move(filePath)), bufferSize_(bufferSize),
+		  wordsInserted_(0) {}
 
-    void Execute() override {
-        try {
-            wordsInserted_ = instance_->trie_.bulk_insert_from_file(filePath_, bufferSize_);
-        } catch (const std::exception &e) {
-            SetError(e.what());
-        }
-    }
+	void Execute() override {
+		try {
+			wordsInserted_ =
+				instance_->trie_.bulk_insert_from_file(filePath_, bufferSize_);
+		} catch (const std::exception &e) {
+			SetError(e.what());
+		}
+	}
 
-    void OnOK() override {
-        Napi::HandleScope scope(Env());
-        Callback().Call({Env().Null(), Napi::Number::New(Env(), static_cast<double>(wordsInserted_))});
-    }
+	void OnOK() override {
+		Napi::HandleScope scope(Env());
+		Callback().Call(
+			{Env().Null(),
+			 Napi::Number::New(Env(), static_cast<double>(wordsInserted_))});
+	}
 
-    void OnError(const Napi::Error &e) override {
-        Napi::HandleScope scope(Env());
-        Callback().Call({e.Value(), Env().Undefined()});
-    }
+	void OnError(const Napi::Error &e) override {
+		Napi::HandleScope scope(Env());
+		Callback().Call({e.Value(), Env().Undefined()});
+	}
 
   private:
-    Seshat *instance_;
-    std::string filePath_;
-    size_t bufferSize_;
-    size_t wordsInserted_;
+	Seshat *instance_;
+	std::string filePath_;
+	size_t bufferSize_;
+	size_t wordsInserted_;
 };
 
 // InsertFromFileAsync method
 Napi::Value Seshat::InsertFromFileAsync(const Napi::CallbackInfo &info) {
-    Napi::Env env = info.Env();
+	Napi::Env env = info.Env();
 
-    if (info.Length() < 2 || !info[0].IsString() || !info[info.Length()-1].IsFunction()) {
-        Napi::TypeError::New(env, "Expected (filePath: string, [bufferSize?: number], callback: Function)")
-            .ThrowAsJavaScriptException();
-        return env.Undefined();
-    }
+	if (info.Length() < 2 || !info[0].IsString() ||
+		!info[info.Length() - 1].IsFunction()) {
+		Napi::TypeError::New(env, "Expected (filePath: string, [bufferSize?: "
+								  "number], callback: Function)")
+			.ThrowAsJavaScriptException();
+		return env.Undefined();
+	}
 
-    std::string file_path = info[0].As<Napi::String>().Utf8Value();
+	std::string file_path = info[0].As<Napi::String>().Utf8Value();
 
-    // Default buffer size of 1MB
-    size_t buffer_size = 1024 * 1024;
+	// Default buffer size of 1MB
+	size_t buffer_size = 1024 * 1024;
 
-    // If a numeric second arg before callback is provided, treat as bufferSize
-    if (info.Length() == 3 && info[1].IsNumber()) {
-        double buffer_size_double = info[1].As<Napi::Number>().DoubleValue();
-        if (buffer_size_double <= 0 || buffer_size_double > SIZE_MAX) {
-            Napi::RangeError::New(env, "Buffer size must be positive and within valid range")
-                .ThrowAsJavaScriptException();
-            return env.Undefined();
-        }
-        buffer_size = static_cast<size_t>(buffer_size_double);
-        if (buffer_size < 1024) buffer_size = 1024;
-    }
+	// If a numeric second arg before callback is provided, treat as bufferSize
+	if (info.Length() == 3 && info[1].IsNumber()) {
+		double buffer_size_double = info[1].As<Napi::Number>().DoubleValue();
+		if (buffer_size_double <= 0 || buffer_size_double > SIZE_MAX) {
+			Napi::RangeError::New(
+				env, "Buffer size must be positive and within valid range")
+				.ThrowAsJavaScriptException();
+			return env.Undefined();
+		}
+		buffer_size = static_cast<size_t>(buffer_size_double);
+		if (buffer_size < 1024)
+			buffer_size = 1024;
+	}
 
-    Napi::Function cb = info[info.Length()-1].As<Napi::Function>();
+	Napi::Function cb = info[info.Length() - 1].As<Napi::Function>();
 
-    auto *worker = new InsertFromFileWorker(this, file_path, buffer_size, cb);
-    worker->Queue();
-    return env.Undefined();
+	auto *worker = new InsertFromFileWorker(this, file_path, buffer_size, cb);
+	worker->Queue();
+	return env.Undefined();
 }
 
 // Get height statistics

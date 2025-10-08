@@ -18,7 +18,9 @@ class Seshat : public Napi::ObjectWrap<Seshat> {
 	// Methods exposed to JavaScript
 	Napi::Value Insert(const Napi::CallbackInfo &info);
 	Napi::Value InsertBatch(const Napi::CallbackInfo &info);
-	Napi::Value InsertFromFile(const Napi::CallbackInfo &info); // this is primarily used for benchmarking and testing
+	Napi::Value InsertFromFile(
+		const Napi::CallbackInfo
+			&info); // this is primarily used for benchmarking and testing
 	Napi::Value InsertFromFileAsync(const Napi::CallbackInfo &info);
 	Napi::Value Search(const Napi::CallbackInfo &info);
 	Napi::Value SearchBatch(const Napi::CallbackInfo &info);

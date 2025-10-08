@@ -989,30 +989,30 @@ describe("Seshat", () => {
 });
 
 describe("Async File Insertion", () => {
-    test("should insert words from file asynchronously", done => {
-        const tmpFile = fs.mkdtempSync(`${os.tmpdir()}${require('path').sep}seshat-`) + require('path').sep + "words.txt";
+	test("should insert words from file asynchronously", done => {
+		const tmpFile = fs.mkdtempSync(`${os.tmpdir()}${require("path").sep}seshat-`) + require("path").sep + "words.txt";
 
-        // Ensure directory exists and write file
-        fs.mkdirSync(require('path').dirname(tmpFile), { recursive: true });
-        const contents = ["alpha", "beta", "gamma", "delta"].join("\n") + "\n";
-        fs.writeFileSync(tmpFile, contents, "utf8");
+		// Ensure directory exists and write file
+		fs.mkdirSync(require("path").dirname(tmpFile), { recursive: true });
+		const contents = ["alpha", "beta", "gamma", "delta"].join("\n") + "\n";
+		fs.writeFileSync(tmpFile, contents, "utf8");
 
-        const t = new Seshat();
-        t.insertFromFileAsync(tmpFile, 1024, (err, count) => {
-            try {
-                expect(err).toBeNull();
-                expect(count).toBe(4);
-                expect(t.size()).toBe(4);
-                expect(t.search("alpha")).toBe(true);
-                expect(t.search("beta")).toBe(true);
-                expect(t.search("gamma")).toBe(true);
-                expect(t.search("delta")).toBe(true);
-                done();
-            } catch (e) {
-                done(e);
-            } finally {
-                try { fs.unlinkSync(tmpFile); } catch {}
-            }
-        });
-    });
+		const t = new Seshat();
+		t.insertFromFileAsync(tmpFile, 1024, (err, count) => {
+			try {
+				expect(err).toBeNull();
+				expect(count).toBe(4);
+				expect(t.size()).toBe(4);
+				expect(t.search("alpha")).toBe(true);
+				expect(t.search("beta")).toBe(true);
+				expect(t.search("gamma")).toBe(true);
+				expect(t.search("delta")).toBe(true);
+				done();
+			} catch (e) {
+				done(e);
+			} finally {
+				try { fs.unlinkSync(tmpFile); } catch {}
+			}
+		});
+	});
 });
