@@ -1,0 +1,80 @@
+{
+	"name": "seshat",
+	"version": "1.0.0",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"files": [
+		"dist/",
+		"build/Release/seshat.node",
+		"README.md"
+	],
+	"scripts": {
+		"build": "node-gyp rebuild && tsc",
+		"build:debug": "node-gyp rebuild --debug",
+		"clean": "node-gyp clean",
+		"dev": "npm run build && nodemon lib/index.ts",
+		"test": "jest",
+		"format:cc": "find . -name \"*.cc\" -exec clang-format -i {} \\;",
+		"format:all": "find . \\( -name \"*.cc\" -o -name \"*.cpp\" -o -name \"*.h\" \\) -exec clang-format -i {} \\;",
+		"format": "find . \\( -name \"*.cc\" -o -name \"*.cpp\" -o -name \"*.h\" \\) -exec clang-format -i {} \\; && eslint . --fix",
+		"setupTextFiles": "mkdir textfiles && cd textfiles && wget https://norvig.com/ngrams/enable1.txt && wget https://raw.githubusercontent.com/ScriptSmith/topwords/master/words.txt && wget https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/badwordslist/badwords.txt",
+		"benchmark:filestream": "ts-node benchmarks/filestream.ts",
+		"benchmark": "ts-node benchmarks/benchmark.ts"
+	},
+	"gypfile": true,
+	"keywords": [
+		"trie",
+		"radix trie",
+		"seshat",
+		"seshat-trie",
+		"c++",
+		"javascript",
+		"typescript"
+	],
+	"author": "grml",
+	"license": "MIT",
+	"description": "A trie library for JavaScript with C++ bindings.",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/grml/seshat"
+	},
+	"homepage": "https://github.com/grml/seshat",
+	"bugs": "https://github.com/grml/seshat/issues",
+	"devDependencies": {
+		"@types/jest": "^30.0.0",
+		"@types/node": "^24.3.0",
+		"eslint": "^9.33.0",
+		"jest": "^30.0.5",
+		"nodemon": "^3.1.10",
+		"ts-jest": "^29.4.1",
+		"ts-node": "^10.9.2",
+		"typescript": "^5.9.2",
+		"typescript-eslint": "^8.40.0"
+	},
+	"dependencies": {
+		"node-addon-api": "^8.5.0"
+	},
+	"jest": {
+		"preset": "ts-jest",
+		"testEnvironment": "node",
+		"roots": [
+			"<rootDir>/tests"
+		],
+		"testMatch": [
+			"**/*.test.ts"
+		],
+		"collectCoverageFrom": [
+			"lib/**/*.{ts,js}",
+			"!lib/**/*.d.ts"
+		],
+		"transform": {
+			"^.+\\.ts$": "ts-jest"
+		},
+		"moduleFileExtensions": [
+			"ts",
+			"js",
+			"json",
+			"node"
+		]
+	}
+}

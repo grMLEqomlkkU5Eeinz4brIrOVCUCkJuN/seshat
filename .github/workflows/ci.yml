@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install system deps (clang-format, node-gyp prereqs)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang-format python3 make g++
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (node-gyp + tsc)
+        run: npm run build
+
+      - name: Ensure textfiles exist
+        run: |
+          if [ ! -d textfiles ] || [ -z "$(ls -A textfiles 2>/dev/null)" ]; then
+            npm run setupTextFiles
+          fi
+
+      - name: Run benchmarks (Node)
+        run: |
+          npx ts-node benchmarks/benchmark.ts
+          npx ts-node benchmarks/filestream.ts
+
+      - name: Run tests (Jest)
+        env:
+          CI: true
+        run: npm test -- --runInBand
+
+

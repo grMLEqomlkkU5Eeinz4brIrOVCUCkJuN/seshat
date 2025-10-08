@@ -1,0 +1,10 @@
+.ccls-cache
+node_modules
+build
+dist
+textfiles
+trie-export.json
+benchmarks
+tests
+eslint.config.mjs
+docs
