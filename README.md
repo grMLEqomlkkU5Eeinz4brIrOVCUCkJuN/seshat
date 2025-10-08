@@ -2,7 +2,7 @@
 
 ![Seshat](https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Hatshepsut_and_Seshat.jpg/960px-Hatshepsut_and_Seshat.jpg)
 
-Image source: [Wikipedia — Seshat](https://en.wikipedia.org/wiki/Seshat)
+Image source: [Wikipedia - Seshat](https://en.wikipedia.org/wiki/Seshat)
 
 Radix trie for Node.js with a C++ core and a TypeScript API.
 
