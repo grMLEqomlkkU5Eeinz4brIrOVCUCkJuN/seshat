@@ -8,7 +8,7 @@ Radix trie for Node.js with a C++ core and a TypeScript API.
 
 ## Install
 
-Prerequisites: a working C/C++ toolchain for `node-gyp` (Python, make, compiler). On Linux, install your distro's build tools.
+Prerequisites: a working C/C++ toolchain for `node-gyp` (Python, make, compiler). On Linux, install your distro's build tools. This happened because of the way a few of my accounts are set up (some of my accounts are for school and whatnot, which have 2FA mandatorily enabled, breaking github actions and more)
 
 ```bash
 npm install seshat
