@@ -1,6 +1,6 @@
 # Seshat Trie
 
-![Seshat](./docs/assets/seshat.png)
+![Seshat](https://en.wikipedia.org/wiki/File:Hatshepsut_and_Seshat.jpg)
 
 Image source: [Wikipedia — Seshat](https://en.wikipedia.org/wiki/Seshat)
 
@@ -11,7 +11,7 @@ Radix trie for Node.js with a C++ core and a TypeScript API.
 Prerequisites: a working C/C++ toolchain for `node-gyp` (Python, make, compiler). On Linux, install your distro's build tools. This happened because of the way a few of my accounts are set up (some of my accounts are for school and whatnot, which have 2FA mandatorily enabled, breaking github actions and more)
 
 ```bash
-npm install seshat
+npm install seshat-trie
 ```
 
 ### OS prerequisites for local compilation
@@ -36,7 +36,7 @@ Supported Node versions: Node 18, 20, or 22 (see `engines` field). `npm install`
 ## Quick start
 
 ```ts
-import { Seshat } from "seshat";
+import { Seshat } from "seshat-trie";
 
 const trie = new Seshat({ ignoreCase: false });
 

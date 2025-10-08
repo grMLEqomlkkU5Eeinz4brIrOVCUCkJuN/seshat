@@ -1,13 +1,17 @@
 {
-	"name": "seshat",
+	"name": "seshat-trie",
 	"version": "1.0.0",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"files": [
- 		"dist/",
- 		"src/",
- 		"binding.gyp"
- 	],
+		"dist/",
+		"src/",
+		"binding.gyp",
+		"README.md"
+	],
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
 		"build": "node-gyp rebuild && tsc",
 		"install": "node-gyp rebuild",
@@ -38,7 +42,7 @@
 	"description": "A trie library for JavaScript with C++ bindings.",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/grMLEqomlkkU5Eeinz4brIrOVCUCkJuN/seshat"
+		"url": "git+https://github.com/grMLEqomlkkU5Eeinz4brIrOVCUCkJuN/seshat.git"
 	},
 	"homepage": "https://github.com/grMLEqomlkkU5Eeinz4brIrOVCUCkJuN/seshat",
 	"bugs": "https://github.com/grMLEqomlkkU5Eeinz4brIrOVCUCkJuN/seshat/issues",
