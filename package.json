@@ -4,12 +4,14 @@
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
 	"files": [
-		"dist/",
-		"build/Release/seshat.node",
-		"README.md"
-	],
+ 		"dist/",
+ 		"src/",
+ 		"binding.gyp"
+ 	],
 	"scripts": {
 		"build": "node-gyp rebuild && tsc",
+		"install": "node-gyp rebuild",
+		"prepack": "tsc",
 		"build:debug": "node-gyp rebuild --debug",
 		"clean": "node-gyp clean",
 		"dev": "npm run build && nodemon lib/index.ts",
@@ -36,10 +38,10 @@
 	"description": "A trie library for JavaScript with C++ bindings.",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/grml/seshat"
+		"url": "https://github.com/grMLEqomlkkU5Eeinz4brIrOVCUCkJuN/seshat"
 	},
-	"homepage": "https://github.com/grml/seshat",
-	"bugs": "https://github.com/grml/seshat/issues",
+	"homepage": "https://github.com/grMLEqomlkkU5Eeinz4brIrOVCUCkJuN/seshat",
+	"bugs": "https://github.com/grMLEqomlkkU5Eeinz4brIrOVCUCkJuN/seshat/issues",
 	"engines": {
 		"node": ">=18"
 	},
