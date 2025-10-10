@@ -14,15 +14,42 @@ Prerequisites: a working C/C++ toolchain for `node-gyp` (Python, make, compiler)
 npm install seshat-trie
 ```
 
+## Benchmarks
+
+Honestly a little nervous about this, but there is a [Benchmarks results file](./benchmarks/benchmark.md). Hope you enjoy this repo. (I felt like this project may have under performed in some ways I did not expect after working on the C++ version)
+
+## JSON import sample schema
+
+```
+{
+	"words": [
+		"aa",
+		"aah",
+		"aahed",
+		"aahing",
+		"aahs",
+		"aal",
+		"aalii",
+		"aaliis",
+		"aals"
+	],
+	"options": {
+		"ignoreCase": false
+	}
+}
+```
+
 ### OS prerequisites for local compilation
 
 - Linux
+
   - Python 3, make, C/C++ compiler and headers
   - Debian/Ubuntu: `sudo apt-get install -y build-essential python3`
   - Fedora/RHEL: `sudo dnf install -y @development-tools python3`
   - Arch: `sudo pacman -S --needed base-devel python`
 
 - macOS
+
   - Xcode Command Line Tools and Python 3
   - Install: `xcode-select --install` and `brew install python`
 
@@ -63,6 +90,7 @@ console.log(trie.getWordsWithPrefix("he")); // ["help", "hello"]
 Methods are synchronous unless noted.
 
 - **constructor(options?)**
+
   - `options.words?: string[]` initial words to insert
   - `options.ignoreCase?: boolean` default `false`
 
