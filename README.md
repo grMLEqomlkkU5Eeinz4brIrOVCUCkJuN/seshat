@@ -4,7 +4,11 @@
 
 Image source: [Wikipedia - Seshat](https://en.wikipedia.org/wiki/Seshat)
 
-Radix trie for Node.js with a C++ core and a TypeScript API.
+A high-performance radix trie (prefix tree) for Node.js with a C++ core and TypeScript API.
+
+## What is this?
+
+A radix trie implementation with C++ performance for fast prefix-based searches. Useful for autocomplete, spell checking, and dictionary lookups where you need to quickly find words by their prefixes.
 
 ## Install
 
@@ -14,13 +18,16 @@ Prerequisites: a working C/C++ toolchain for `node-gyp` (Python, make, compiler)
 npm install seshat-trie
 ```
 
+## Performance-Notes
+Due to N-API overhead when crossing the JavaScript/C++ boundary, individual operations (especially small batch inserts) may be slower than expected on some systems (higher single-core performance is better for this library). For bulk insertions, use insertFromFile() or insertFromFileAsync() which handle file I/O entirely in C++, avoiding per-word marshalling costs.
+
 ## Benchmarks
 
 Honestly a little nervous about this, but there is a [Benchmarks results file](./benchmarks/benchmark.md). Hope you enjoy this repo. (I felt like this project may have under performed in some ways I did not expect after working on the C++ version)
 
 ## JSON import sample schema
 
-```
+```json
 {
 	"words": [
 		"aa",
