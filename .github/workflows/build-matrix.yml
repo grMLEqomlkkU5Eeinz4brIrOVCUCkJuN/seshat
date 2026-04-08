@@ -44,11 +44,7 @@ jobs:
 
       - name: Setup build tools (Windows)
         if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          npm install --global windows-build-tools@5.2.2 || true
-          npm config set msvs_version 2019
-          choco install -y python --version=3.11.9 || choco upgrade -y python || $true
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install dependencies
         run: npm ci
