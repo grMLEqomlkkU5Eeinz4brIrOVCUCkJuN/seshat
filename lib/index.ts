@@ -51,12 +51,19 @@ export interface SeshatOptions {
 	 * Initial words to insert into the trie
 	 */
 	words?: string[];
-  
+
 	/**
 	 * Whether to ignore case when inserting/searching
 	 * @default false
 	 */
 	ignoreCase?: boolean;
+
+	/**
+	 * Maximum number of words the trie will hold.
+	 * Insertions that would exceed this limit throw an Error.
+	 * @default undefined (no limit)
+	 */
+	maxSize?: number;
   }
   
 /**
@@ -92,6 +99,8 @@ export interface TrieStats {
 export class Seshat {
 	  private readonly nativeTrie: NativeSeshat;
 	  private readonly ignoreCase: boolean;
+	  private readonly maxSize: number | undefined;
+	  private readonly originalCasing: Map<string, string> = new Map();
   
 	  /**
 	 * Create a new Seshat instance
@@ -101,6 +110,7 @@ export class Seshat {
 	  constructor(options: SeshatOptions = {}) {
 		  this.nativeTrie = new native.Seshat();
 		  this.ignoreCase = options.ignoreCase ?? false;
+		  this.maxSize = options.maxSize;
   
 		  // Insert initial words if provided
 		  if (options.words && options.words.length > 0) {
@@ -112,6 +122,7 @@ export class Seshat {
   
 	  /**
 	   * Get height statistics for the trie
+	   * @remarks This performs a full O(n) traversal of the trie. Avoid calling frequently on large tries.
 	   * @returns Object with minHeight, maxHeight, averageHeight, modeHeight, allHeights
 	   */
 	  getHeightStats(): {
@@ -126,6 +137,7 @@ export class Seshat {
   
 	  /**
 	   * Get memory usage statistics for the trie
+	   * @remarks This performs a full O(n) traversal of the trie. Avoid calling frequently on large tries.
 	   * @returns Object with totalBytes, nodeCount, stringBytes, overheadBytes, bytesPerWord
 	   */
 	  getMemoryStats(): {
@@ -140,6 +152,7 @@ export class Seshat {
   
 	  /**
 	   * Get word metrics for the trie
+	   * @remarks This performs a full O(n) traversal of the trie. Avoid calling frequently on large tries.
 	   * @returns Object with minLength, maxLength, averageLength, modeLength, lengthDistribution, totalCharacters
 	   */
 	  getWordMetrics(): {
@@ -155,6 +168,7 @@ export class Seshat {
   
 	  /**
 	   * Search for words matching a pattern (supports * and ? wildcards)
+	   * @remarks This performs a full O(n) traversal of the trie. Avoid calling frequently on large tries.
 	   * @param pattern - Pattern string with wildcards
 	   * @returns Array of matching words
 	   */
@@ -162,7 +176,12 @@ export class Seshat {
 		  if (typeof pattern !== "string") {
 			  throw new TypeError("Pattern must be a string");
 		  }
-		  return this.nativeTrie.patternSearch(pattern);
+		  const normalizedPattern = this.ignoreCase ? pattern.toLowerCase() : pattern;
+		  const results = this.nativeTrie.patternSearch(normalizedPattern);
+		  if (this.ignoreCase) {
+			  return results.map(word => this.originalCasing.get(word) ?? word);
+		  }
+		  return results;
 	  }
   
 	  /**
@@ -175,11 +194,20 @@ export class Seshat {
 		  return this.ignoreCase ? word.toLowerCase() : word;
 	  }
   
+	  private checkCapacity(additionalWords: number = 1): void {
+		  if (this.maxSize !== undefined && this.size() + additionalWords > this.maxSize) {
+			  throw new Error(`Trie capacity exceeded: cannot add ${additionalWords} word(s), limit is ${this.maxSize}`);
+		  }
+	  }
+
 	  /**
 	 * Validate that a word is not empty
 	 */
 	  private validateWord(word: string): void {
-		  if (!word || word.trim().length === 0) {
+		  if (typeof word !== "string") {
+			  throw new TypeError("Word must be a string");
+		  }
+		  if (word.trim().length === 0) {
 			  throw new Error("Word cannot be empty or whitespace only");
 		  }
 	  }
@@ -199,8 +227,12 @@ export class Seshat {
 	 */
 	  insert(word: string): void {
 		  this.validateWord(word);
+		  this.checkCapacity();
 		  const normalizedWord = this.normalizeWord(word);
 		  this.nativeTrie.insert(normalizedWord);
+		  if (this.ignoreCase) {
+			  this.originalCasing.set(normalizedWord, word);
+		  }
 	  }
   
 	  /**
@@ -222,11 +254,19 @@ export class Seshat {
 			  throw new TypeError("Words must be an array");
 		  }
   
-		  // Normalize all words before batch insert
-		  const normalizedWords = words
-			  .filter(word => word && typeof word === "string" && word.trim().length > 0)
-			  .map(word => this.normalizeWord(word));
-  
+		  for (const word of words) {
+			  this.validateWord(word);
+		  }
+		  this.checkCapacity(words.length);
+
+		  const normalizedWords = words.map(word => this.normalizeWord(word));
+
+		  if (this.ignoreCase) {
+			  for (let i = 0; i < words.length; i++) {
+				  this.originalCasing.set(normalizedWords[i], words[i]);
+			  }
+		  }
+
 		  return this.nativeTrie.insertBatch(normalizedWords);
 	  }
   
@@ -263,8 +303,11 @@ export class Seshat {
   
 		  try {
 			  return this.nativeTrie.insertFromFile(filePath, bufferSize);
-		  } catch (error: any) {
-			  throw new Error(`Failed to insert from file: ${error.message}`);
+		  } catch (error) {
+			  if (error instanceof Error) {
+				  throw new Error(`Failed to insert from file: ${error.message}`, { cause: error });
+			  }
+			  throw new Error(`Failed to insert from file: ${String(error)}`);
 		  }
 	  }
   
@@ -274,24 +317,24 @@ export class Seshat {
 	   * @param bufferSize Optional buffer size in bytes (default 1MB)
 	   * @param cb Callback (err, count)
 	   */
-	  insertFromFileAsync(filePath: string, bufferSizeOrCb?: number | ((err: Error | null, count?: number) => void), cb?: (err: Error | null, count?: number) => void): void {
+	  insertFromFileAsync(filePath: string, cb: (err: Error | null, count?: number) => void): void;
+	  insertFromFileAsync(filePath: string, bufferSize: number, cb: (err: Error | null, count?: number) => void): void;
+	  insertFromFileAsync(filePath: string, bufferSizeOrCb: number | ((err: Error | null, count?: number) => void), cb?: (err: Error | null, count?: number) => void): void {
 		  if (typeof filePath !== "string") {
 			  throw new TypeError("File path must be a string");
 		  }
 
-		  // Overload handling: (path, cb) or (path, bufferSize, cb)
 		  let bufferSize: number | undefined;
-		  let callback: ((err: Error | null, count?: number) => void) | undefined;
+		  let callback: (err: Error | null, count?: number) => void;
 
 		  if (typeof bufferSizeOrCb === "function") {
 			  callback = bufferSizeOrCb;
 		  } else {
 			  bufferSize = bufferSizeOrCb;
-			  callback = cb!; // Assert callback is defined since it's required
-		  }
-
-		  if (typeof callback !== "function") {
-			  throw new TypeError("Callback function is required");
+			  if (typeof cb !== "function") {
+				  throw new TypeError("Callback function is required");
+			  }
+			  callback = cb;
 		  }
 
 		  if (bufferSize !== undefined) {
@@ -301,11 +344,12 @@ export class Seshat {
 		  }
 
 		  try {
-			  // Native expects (path, [bufferSize], cb). Passing undefined is fine.
-			  (this.nativeTrie as any).insertFromFileAsync(filePath, bufferSize, callback);
-		  } catch (error: any) {
-			  // surface async scheduling error synchronously
-			  throw new Error(`Failed to schedule insertFromFileAsync: ${error.message}`);
+			  this.nativeTrie.insertFromFileAsync(filePath, bufferSize, callback);
+		  } catch (error) {
+			  if (error instanceof Error) {
+				  throw new Error(`Failed to schedule insertFromFileAsync: ${error.message}`, { cause: error });
+			  }
+			  throw new Error(`Failed to schedule insertFromFileAsync: ${String(error)}`);
 		  }
 	  }
 
@@ -410,9 +454,10 @@ export class Seshat {
   
 		  const normalizedPrefix = this.normalizeWord(prefix);
 		  const results = this.nativeTrie.wordsWithPrefix(normalizedPrefix);
-  
-		  // If case insensitive, we might want to return original casing
-		  // For now, we return the normalized results
+
+		  if (this.ignoreCase) {
+			  return results.map(word => this.originalCasing.get(word) ?? word);
+		  }
 		  return results;
 	  }
   
@@ -440,7 +485,11 @@ export class Seshat {
 		  }
   
 		  const normalizedWord = this.normalizeWord(word);
-		  return this.nativeTrie.remove(normalizedWord);
+		  const removed = this.nativeTrie.remove(normalizedWord);
+		  if (removed && this.ignoreCase) {
+			  this.originalCasing.delete(normalizedWord);
+		  }
+		  return removed;
 	  }
   
 	  /**
@@ -467,28 +516,15 @@ export class Seshat {
 			  word && typeof word === "string" ? this.normalizeWord(word) : ""
 		  );
   
-		  return this.nativeTrie.removeBatch(normalizedWords);
-	  }
-  
-	  /**
-	 * Remove multiple words from the trie
-	 *
-	 * @param words - Array of words to remove
-	 * @returns Array of booleans indicating which words were successfully removed
-	 * @throws {TypeError} If words is not an array
-	 *
-	 * @example
-	 * ```typescript
-	 * trie.insertMany(['hello', 'world']);
-	 * const results = trie.removeMany(['hello', 'foo']); // [true, false]
-	 * ```
-	 */
-	  removeMany(words: string[]): boolean[] {
-		  if (!Array.isArray(words)) {
-			  throw new TypeError("Words must be an array");
+		  const results = this.nativeTrie.removeBatch(normalizedWords);
+		  if (this.ignoreCase) {
+			  for (let i = 0; i < results.length; i++) {
+				  if (results[i]) {
+					  this.originalCasing.delete(normalizedWords[i]);
+				  }
+			  }
 		  }
-  
-		  return words.map(word => this.remove(word));
+		  return results;
 	  }
   
 	  /**
@@ -536,6 +572,7 @@ export class Seshat {
 	 */
 	  clear(): void {
 		  this.nativeTrie.clear();
+		  this.originalCasing.clear();
 	  }
   
 	  /**
@@ -625,6 +662,3 @@ export class Seshat {
   
 // Export the class as default
 export default Seshat;
-  
-// Also export the native module for direct access
-export { native as nativeModule };

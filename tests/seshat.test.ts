@@ -67,8 +67,8 @@ describe("Seshat", () => {
 		});
 
 		test("should throw error for non-string input", () => {
-			expect(() => trie.insert(null as any)).toThrow("Word cannot be empty or whitespace only");
-			expect(() => trie.insert(123 as any)).toThrow("word.trim is not a function");
+			expect(() => trie.insert(null as any)).toThrow("Word must be a string");
+			expect(() => trie.insert(123 as any)).toThrow("Word must be a string");
 		});
 
 		test("should handle bulk insertions", () => {
@@ -232,8 +232,8 @@ describe("Seshat", () => {
 			expect(() => trie.remove(123 as any)).toThrow("Word must be a string");
 		});
 
-		test("should remove multiple words", () => {
-			const results = trie.removeMany(["hello", "xyz", "world"]);
+		test("should remove multiple words via removeBatch", () => {
+			const results = trie.removeBatch(["hello", "xyz", "world"]);
 
 			expect(results).toEqual([true, false, true]);
 			expect(trie.size()).toBe(2);
@@ -241,11 +241,6 @@ describe("Seshat", () => {
 			expect(trie.search("world")).toBe(false);
 			expect(trie.search("help")).toBe(true);
 			expect(trie.search("test")).toBe(true);
-		});
-
-		test("should throw error for non-array in removeMany", () => {
-			expect(() => trie.removeMany(null as any)).toThrow("Words must be an array");
-			expect(() => trie.removeMany("not-array" as any)).toThrow("Words must be an array");
 		});
 	});
 
@@ -404,6 +399,50 @@ describe("Seshat", () => {
 
 			const words = caseInsensitiveTrie.getWordsWithPrefix("he");
 			expect(words).toHaveLength(2);
+		});
+
+		test("should preserve original casing in ignoreCase mode", () => {
+			const trie = new Seshat({ ignoreCase: true });
+			trie.insert("Hello");
+			trie.insert("World");
+			trie.insert("JavaScript");
+
+			const words = trie.getWordsWithPrefix("");
+			expect(words).toContain("Hello");
+			expect(words).toContain("World");
+			expect(words).toContain("JavaScript");
+			expect(words).not.toContain("hello");
+			expect(words).not.toContain("world");
+
+			const prefixed = trie.getWordsWithPrefix("he");
+			expect(prefixed).toEqual(["Hello"]);
+
+			const json = trie.toJSON();
+			expect(json.words).toContain("Hello");
+			expect(json.words).not.toContain("hello");
+		});
+	});
+
+	describe("Max Size", () => {
+		test("should enforce maxSize on insert", () => {
+			const limitedTrie = new Seshat({ maxSize: 2 });
+			limitedTrie.insert("hello");
+			limitedTrie.insert("world");
+			expect(() => limitedTrie.insert("test")).toThrow("Trie capacity exceeded");
+		});
+
+		test("should enforce maxSize on insertBatch", () => {
+			const limitedTrie = new Seshat({ maxSize: 2 });
+			expect(() => limitedTrie.insertBatch(["a", "b", "c"])).toThrow("Trie capacity exceeded");
+		});
+
+		test("should allow inserts after removal frees space", () => {
+			const limitedTrie = new Seshat({ maxSize: 2 });
+			limitedTrie.insert("hello");
+			limitedTrie.insert("world");
+			limitedTrie.remove("hello");
+			limitedTrie.insert("test");
+			expect(limitedTrie.size()).toBe(2);
 		});
 	});
 
@@ -698,15 +737,10 @@ describe("Seshat", () => {
 				expect(trie.size()).toBe(0);
 			});
 
-			test("should filter out invalid words", () => {
-				const words = ["hello", "", "world", null, "test", undefined];
-				const count = trie.insertBatch(words as any);
-
-				expect(count).toBe(3);
-				expect(trie.size()).toBe(3);
-				expect(trie.search("hello")).toBe(true);
-				expect(trie.search("world")).toBe(true);
-				expect(trie.search("test")).toBe(true);
+			test("should throw on invalid words", () => {
+				expect(() => trie.insertBatch(["hello", "", "world"])).toThrow("Word cannot be empty or whitespace only");
+				expect(() => trie.insertBatch(["hello", null as any, "world"])).toThrow("Word must be a string");
+				expect(() => trie.insertBatch(["hello", 123 as any, "world"])).toThrow("Word must be a string");
 			});
 
 			test("should throw error for non-array input", () => {

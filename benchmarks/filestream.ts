@@ -5,7 +5,7 @@ console.log("Seshat File-Streaming Benchmark");
 console.log("==============================");
 
 const trie = new Seshat();
-const filePath = "./textfiles/enable1.txt";
+const filePath = "./textfiles/terms.txt";
 const bufferSize = 16 * 1024 * 1024; // 16MB buffer
 
 // Start timing

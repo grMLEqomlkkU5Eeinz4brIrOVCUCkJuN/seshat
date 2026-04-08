@@ -100,6 +100,7 @@ Methods are synchronous unless noted.
 
   - `options.words?: string[]` initial words to insert
   - `options.ignoreCase?: boolean` default `false`
+  - `options.maxSize?: number` maximum number of words (throws on overflow; not enforced for file-based insertion)
 
 - **insert(word: string): void**
 - **insertBatch(words: string[]): number** returns count inserted
@@ -114,7 +115,6 @@ Methods are synchronous unless noted.
 
 - **remove(word: string): boolean**
 - **removeBatch(words: string[]): boolean[]**
-- **removeMany(words: string[]): boolean[]** (helper built on `remove`)
 
 - **isEmpty(): boolean**
 - **size(): number**
@@ -140,7 +140,7 @@ Methods are synchronous unless noted.
 
 ### Case handling
 
-When `ignoreCase` is `true`, inputs are lowercased internally. Returned words reflect stored (normalized) casing.
+When `ignoreCase` is `true`, inputs are lowercased internally for matching, but original casing is preserved. Methods like `getWordsWithPrefix`, `toJSON`, and `patternSearch` return words in their original casing as inserted.
 
 ## File input format
 
