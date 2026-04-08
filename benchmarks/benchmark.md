@@ -1,11 +1,10 @@
-Microsoft windows 17-1255u 16GB LPDDR4 SODIMM single channel.
+Linux 6.19.11-arch1-1
 
-Due to the way that this thing was set up, it runs too fast for me to change the CPU affinity on windows and for some reason the command line behaviour is inconsistent. Therefore, there is no way for me to set it to a specific core, I am just hoping it runs on a P core lol.
 # Main Benchmarks
 
+Run 1:
 ```
-
-> seshat-trie@1.0.0 benchmark
+> seshat-trie@1.0.1 benchmark
 > ts-node benchmarks/benchmark.ts
 
 Seshat Stable Performance Benchmarks
@@ -24,10 +23,10 @@ CV% = Coefficient of Variation (lower is more stable)
 === Analytics Methods ===
 Test Name                Mean Ops/sec   Median      CV%     Range
 --------------------------------------------------------------------------------
-getHeightStats           419,775        429,738     6.4     351617-444050       
-getMemoryStats           903,245        938,967     9.0     665336-943396       
-getWordMetrics           373,385        378,501     5.7     310366-387447
-patternSearch('*a*')     506,985        628,141     29.4    338639-673401
+getHeightStats           589,958        623,220     11.0    494445-668092
+getMemoryStats           1,114,528      1,204,456   13.2    814883-1227762
+getWordMetrics           594,954        622,607     7.4     531460-648929
+patternSearch('*a*')     807,818        845,766     10.8    634965-941708
   Running: Insert
   Warming up...
   Running: Search (hit)
@@ -38,9 +37,9 @@ patternSearch('*a*')     506,985        628,141     29.4    338639-673401
 === Core Operations ===
 Test Name                Mean Ops/sec   Median      CV%     Range
 --------------------------------------------------------------------------------
-Insert                   1,264,372      1,248,907   13.8    996214-1540832
-Search (hit)             5,291,672      5,998,800   24.5    3469813-6784261
-Search (miss)            6,552,249      7,241,130   17.1    4833253-7722008
+Insert                   1,682,521      1,685,687   21.4    807998-2045546
+Search (hit)             9,072,445      9,606,240   18.1    4441996-10219933
+Search (miss)            8,361,319      8,768,622   11.6    5536210-9275233
   Running: Individual Insert 100
   Warming up...
   Running: Batch Insert 100
@@ -53,17 +52,17 @@ Search (miss)            6,552,249      7,241,130   17.1    4833253-7722008
 === Batch vs Individual ===
 Test Name                Mean Ops/sec   Median      CV%     Range
 --------------------------------------------------------------------------------
-Individual Insert 100    30,120         30,553      12.5    24184-39417
-Batch Insert 100         36,571         37,230      25.1    16869-42319
-Individual Search 100    45,280         47,619      15.1    33036-54259
-Batch Search 100         36,296         37,608      7.4     30276-38745
+Individual Insert 100    53,023         51,358      9.7     46512-63269
+Batch Insert 100         42,633         47,296      13.2    33546-48430
+Individual Search 100    73,905         75,187      3.6     66496-75545
+Batch Search 100         42,437         42,262      5.3     38434-46158
   Running: CPU Stability
   Warming up...
 
 === System Stability Check ===
 Test Name                Mean Ops/sec   Median      CV%     Range
 --------------------------------------------------------------------------------
-CPU Stability            674,163        682,128     1.5     649351-682594
+CPU Stability            764,417        765,949     0.4     755886-766072
 
 === Variance Analysis ===
 CV% < 5%:  Excellent stability
@@ -72,10 +71,89 @@ CV% 10-20%: Moderate variance
 CV% > 20%: High variance (system load/thermal throttling)
 
 High Variance Detected:
-  - Search (hit): 24.5% CV
-  - Search (miss): 17.1% CV
-  - Batch Insert 100: 25.1% CV
-  - Individual Search 100: 15.1% CV
+  - Insert: 21.4% CV
+  - Search (hit): 18.1% CV
+
+Recommendations:
+  1. Close unnecessary applications
+  2. Ensure laptop is plugged in (not on battery)
+  3. Set Windows power plan to 'High Performance'
+  4. Run: node --expose-gc benchmark/stable-benchmark.ts
+  5. Let laptop cool down if warm
+```
+
+Run 2:
+```
+> seshat-trie@1.0.1 benchmark
+> ts-node benchmarks/benchmark.ts
+
+Seshat Stable Performance Benchmarks
+=====================================
+Using multiple runs with warm-up and statistical analysis
+CV% = Coefficient of Variation (lower is more stable)
+  Running: getHeightStats
+  Warming up...
+  Running: getMemoryStats
+  Warming up...
+  Running: getWordMetrics
+  Warming up...
+  Running: patternSearch('*a*')
+  Warming up...
+
+=== Analytics Methods ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+getHeightStats           597,379        623,877     9.6     502142-668400
+getMemoryStats           1,096,290      1,198,638   14.1    816587-1251126
+getWordMetrics           579,285        606,984     9.7     487194-646517
+patternSearch('*a*')     798,712        827,438     9.3     651534-907803
+  Running: Insert
+  Warming up...
+  Running: Search (hit)
+  Warming up...
+  Running: Search (miss)
+  Warming up...
+
+=== Core Operations ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+Insert                   1,753,150      1,814,056   15.3    1074939-2018779
+Search (hit)             8,909,550      9,638,554   18.7    4079218-9831682
+Search (miss)            9,109,749      10,001,800  15.6    6038283-10077598
+  Running: Individual Insert 100
+  Warming up...
+  Running: Batch Insert 100
+  Warming up...
+  Running: Individual Search 100
+  Warming up...
+  Running: Batch Search 100
+  Warming up...
+
+=== Batch vs Individual ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+Individual Insert 100    51,270         51,781      8.2     40840-57111
+Batch Insert 100         42,323         43,650      11.8    34600-48084
+Individual Search 100    72,582         74,854      7.5     58326-76706
+Batch Search 100         45,357         46,144      2.7     42813-46231
+  Running: CPU Stability
+  Warming up...
+
+=== System Stability Check ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+CPU Stability            744,243        749,322     1.8     690203-749457
+
+=== Variance Analysis ===
+CV% < 5%:  Excellent stability
+CV% 5-10%: Good stability
+CV% 10-20%: Moderate variance
+CV% > 20%: High variance (system load/thermal throttling)
+
+High Variance Detected:
+  - Insert: 15.3% CV
+  - Search (hit): 18.7% CV
+  - Search (miss): 15.6% CV
 
 Recommendations:
   1. Close unnecessary applications
@@ -86,16 +164,17 @@ Recommendations:
 ```
 
 # File Streaming Benches
-```
 
+Run 1:
+```
 // Terms.txt file from https://github.com/wolfgarbe/PruningRadixTrie/tree/master/PruningRadixTrie
-> seshat-internal@1.0.0 benchmark:filestream
+> seshat-trie@1.0.1 benchmark:filestream
 > ts-node benchmarks/filestream.ts
 
 Seshat File-Streaming Benchmark
 ==============================
 Words inserted: 6273234
-Time taken: 1507.74 ms
+Time taken: 1252.86 ms
 bufferSize: 16777216 bytes
 Memory Stats: {
   "totalBytes": "734.96 MB",
@@ -106,19 +185,46 @@ Memory Stats: {
 }
 Node count: 9117043
 Trie JSON exported to ./trie-export.json
-Export to JSON time: 5606.01 ms
+Export to JSON time: 2586.85 ms
 Trie imported from JSON.
-Import from JSON time: 4877.32 ms
+Import from JSON time: 2842.91 ms
+```
+
+Run 2:
+```
+// Terms.txt file from https://github.com/wolfgarbe/PruningRadixTrie/tree/master/PruningRadixTrie
+> seshat-trie@1.0.1 benchmark:filestream
+> ts-node benchmarks/filestream.ts
+
+Seshat File-Streaming Benchmark
+==============================
+Words inserted: 6273234
+Time taken: 1253.06 ms
+bufferSize: 33554432 bytes
+Memory Stats: {
+  "totalBytes": "734.96 MB",
+  "nodeCount": "8.69 MB",
+  "stringBytes": "39.38 MB",
+  "overheadBytes": "695.58 MB",
+  "bytesPerWord": "122.84912311576453 B"
+}
+Node count: 9117043
+Trie JSON exported to ./trie-export.json
+Export to JSON time: 2647.83 ms
+Trie imported from JSON.
+Import from JSON time: 2842.03 ms
+```
 
 // Enable Text file
-> seshat-trie@1.0.0 benchmark:filestream
+```
+> seshat-trie@1.0.1 benchmark:filestream
 > ts-node benchmarks/filestream.ts
 
 Seshat File-Streaming Benchmark
 ==============================
 Words inserted: 172820
-Time taken: 38.36 ms
-bufferSize: 2097152 bytes
+Time taken: 31.32 ms
+bufferSize: 16777216 bytes
 Memory Stats: {
   "totalBytes": "16.67 MB",
   "nodeCount": "208.65 KB",
@@ -128,42 +234,21 @@ Memory Stats: {
 }
 Node count: 213653
 Trie JSON exported to ./trie-export.json
-Export to JSON time: 55.34 ms
+Export to JSON time: 56.68 ms
 Trie imported from JSON.
-Import from JSON time: 97.17 ms
-
-
-// Google's bad word list
-> seshat-trie@1.0.0 benchmark:filestream
-> ts-node benchmarks/filestream.ts
-
-Seshat File-Streaming Benchmark
-==============================
-Words inserted: 458
-Time taken: 0.43 ms
-bufferSize: 524288 bytes
-Memory Stats: {
-  "totalBytes": "48.90 KB",
-  "nodeCount": "607 B",
-  "stringBytes": "1.46 KB",
-  "overheadBytes": "47.44 KB",
-  "bytesPerWord": "114.31278538812785 B"
-}
-Node count: 607
-Trie JSON exported to ./trie-export.json
-Export to JSON time: 0.55 ms
-Trie imported from JSON.
-Import from JSON time: 0.55 ms
+Import from JSON time: 80.54 ms
+```
 
 // words.txt
-> seshat-trie@1.0.0 benchmark:filestream
+```
+> seshat-trie@1.0.1 benchmark:filestream
 > ts-node benchmarks/filestream.ts
 
 Seshat File-Streaming Benchmark
 ==============================
 Words inserted: 3080821
-Time taken: 1092.15 ms
-bufferSize: 20971520 bytes // yes for some reason this worked best at 20MB, I don't know why
+Time taken: 848.45 ms
+bufferSize: 16777216 bytes
 Memory Stats: {
   "totalBytes": "280.80 MB",
   "nodeCount": "3.43 MB",
@@ -173,7 +258,31 @@ Memory Stats: {
 }
 Node count: 3592260
 Trie JSON exported to ./trie-export.json
-Export to JSON time: 1715.42 ms
+Export to JSON time: 1048.50 ms
 Trie imported from JSON.
-Import from JSON time: 2233.47 ms
+Import from JSON time: 1460.10 ms
+```
+
+// Google's bad word list
+```
+> seshat-trie@1.0.1 benchmark:filestream
+> ts-node benchmarks/filestream.ts
+
+Seshat File-Streaming Benchmark
+==============================
+Words inserted: 458
+Time taken: 2.68 ms
+bufferSize: 16777216 bytes
+Memory Stats: {
+  "totalBytes": "48.90 KB",
+  "nodeCount": "607 B",
+  "stringBytes": "1.46 KB",
+  "overheadBytes": "47.44 KB",
+  "bytesPerWord": "114.31278538812785 B"
+}
+Node count: 607
+Trie JSON exported to ./trie-export.json
+Export to JSON time: 0.27 ms
+Trie imported from JSON.
+Import from JSON time: 0.43 ms
 ```

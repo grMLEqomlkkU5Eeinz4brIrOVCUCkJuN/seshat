@@ -1,4 +1,4 @@
-const native = require("../build/Release/seshat.node");
+const native = require("node-gyp-build")(__dirname + "/..");
 
 interface NativeSeshat {
 	insert(word: string): void;

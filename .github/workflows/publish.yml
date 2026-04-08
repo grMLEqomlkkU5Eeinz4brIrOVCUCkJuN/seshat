@@ -1,0 +1,155 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  prebuild:
+    name: Prebuild ${{ matrix.os }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            arch: x64
+            runner: ubuntu-latest
+          - os: macos
+            arch: x64
+            runner: macos-13
+          - os: macos
+            arch: arm64
+            runner: macos-latest
+          - os: windows
+            arch: x64
+            runner: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup build tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 make g++
+
+      - name: Setup build tools (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install python@3 || true
+
+      - name: Setup build tools (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          npm config set msvs_version 2022
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuildify
+        run: npx prebuildify --napi --strip
+
+      - name: Upload prebuilds
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuilds-${{ matrix.os }}-${{ matrix.arch }}
+          path: prebuilds/
+
+  test:
+    name: Test prebuilds
+    needs: prebuild
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            os: linux
+            arch: x64
+          - runner: macos-13
+            os: macos
+            arch: x64
+          - runner: macos-latest
+            os: macos
+            arch: arm64
+          - runner: windows-latest
+            os: windows
+            arch: x64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Download prebuilds
+        uses: actions/download-artifact@v4
+        with:
+          name: prebuilds-${{ matrix.os }}-${{ matrix.arch }}
+          path: prebuilds/
+
+      - name: Install dependencies (skip native build)
+        run: npm ci --ignore-scripts
+
+      - name: Build TypeScript
+        run: npx tsc
+
+      - name: Run tests
+        run: npx jest --runInBand
+
+  publish:
+    name: Publish to npm
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - name: Download all prebuilds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: prebuilds-*
+          path: prebuilds-all/
+          merge-multiple: false
+
+      - name: Merge prebuilds
+        run: |
+          mkdir -p prebuilds
+          for dir in prebuilds-all/prebuilds-*/; do
+            cp -r "$dir"/* prebuilds/ 2>/dev/null || true
+          done
+          echo "Prebuilds contents:"
+          find prebuilds -type f
+
+      - name: Install dependencies (skip native build)
+        run: npm ci --ignore-scripts
+
+      - name: Build TypeScript
+        run: npx tsc
+
+      - name: Publish
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

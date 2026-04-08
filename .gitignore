@@ -2,5 +2,6 @@
 node_modules
 build
 dist
+prebuilds
 textfiles
 trie-export.json
