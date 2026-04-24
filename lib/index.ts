@@ -1,3 +1,5 @@
+import type { Readable } from "stream";
+
 const native = require("node-gyp-build")(__dirname + "/..");
 
 interface NativeSeshat {
@@ -39,6 +41,8 @@ interface NativeSeshat {
 		  totalCharacters: number;
 	  };
 	  patternSearch(pattern: string): string[];
+	  insertFromBuffer(buffer: Buffer): number;
+	  toBuffer(): Buffer;
 }
 
 
@@ -351,6 +355,131 @@ export class Seshat {
 			  }
 			  throw new Error(`Failed to schedule insertFromFileAsync: ${String(error)}`);
 		  }
+	  }
+
+	  /**
+	   * Insert words from a Buffer containing newline-delimited text.
+	   * This bypasses per-word N-API marshaling overhead, achieving throughput
+	   * comparable to insertFromFile but from in-memory data.
+	   *
+	   * @param buffer - Buffer containing newline-delimited words
+	   * @returns Number of words successfully inserted
+	   * @throws {TypeError} If buffer is not a Buffer
+	   *
+	   * @example
+	   * ```typescript
+	   * const buf = Buffer.from('hello\nworld\ntest\n');
+	   * const count = trie.insertFromBuffer(buf);
+	   * console.log(`Inserted ${count} words`);
+	   * ```
+	   */
+	  insertFromBuffer(buffer: Buffer): number {
+		  if (!Buffer.isBuffer(buffer)) {
+			  throw new TypeError("Argument must be a Buffer");
+		  }
+		  return this.nativeTrie.insertFromBuffer(buffer);
+	  }
+
+	  /**
+	   * Insert words from a Readable stream of newline-delimited text.
+	   * Chunks are processed through the native insertFromBuffer as they arrive,
+	   * with automatic handling of words split across chunk boundaries.
+	   *
+	   * @param stream - A Readable stream providing newline-delimited words
+	   * @returns Promise resolving to the total number of words inserted
+	   *
+	   * @example
+	   * ```typescript
+	   * import { createReadStream } from 'fs';
+	   *
+	   * const count = await trie.insertFromStream(createReadStream('words.txt'));
+	   * console.log(`Inserted ${count} words`);
+	   * ```
+	   */
+	  insertFromStream(stream: Readable): Promise<number> {
+		  return new Promise((resolve, reject) => {
+			  let carry: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+			  let totalInserted = 0;
+
+			  stream.on("data", (chunk: Buffer | string) => {
+				  const buf: Buffer<ArrayBufferLike> = Buffer.isBuffer(chunk)
+					  ? chunk
+					  : Buffer.from(chunk);
+				  const combined = carry.length > 0
+					  ? Buffer.concat([carry, buf])
+					  : buf;
+
+				  let lastNewline = -1;
+				  for (let i = combined.length - 1; i >= 0; i--) {
+					  if (combined[i] === 0x0a || combined[i] === 0x0d) {
+						  lastNewline = i;
+						  break;
+					  }
+				  }
+
+				  if (lastNewline === -1) {
+					  carry = combined;
+					  return;
+				  }
+
+				  const toProcess = combined.subarray(0, lastNewline + 1);
+				  carry = combined.subarray(lastNewline + 1);
+
+				  totalInserted += this.nativeTrie.insertFromBuffer(toProcess);
+			  });
+
+			  stream.on("end", () => {
+				  if (carry.length > 0) {
+					  totalInserted += this.nativeTrie.insertFromBuffer(carry);
+				  }
+				  resolve(totalInserted);
+			  });
+
+			  stream.on("error", (err: Error) => {
+				  reject(err);
+			  });
+		  });
+	  }
+
+	  /**
+	   * Serialize the trie to a Buffer of newline-delimited words.
+	   * This performs serialization entirely in C++, avoiding per-word N-API
+	   * overhead and JSON stringify costs.
+	   *
+	   * @returns Buffer containing newline-delimited words
+	   *
+	   * @example
+	   * ```typescript
+	   * const buf = trie.toBuffer();
+	   * fs.writeFileSync('words.dat', buf);
+	   * ```
+	   */
+	  toBuffer(): Buffer {
+		  return this.nativeTrie.toBuffer();
+	  }
+
+	  /**
+	   * Create a Seshat instance from a Buffer of newline-delimited words.
+	   * This is the fast counterpart to fromJSON — deserialization happens
+	   * entirely in C++, bypassing per-word N-API overhead.
+	   *
+	   * @param buffer - Buffer containing newline-delimited words
+	   * @param options - Configuration options
+	   * @returns New Seshat instance
+	   *
+	   * @example
+	   * ```typescript
+	   * const buf = fs.readFileSync('words.dat');
+	   * const trie = Seshat.fromBuffer(buf);
+	   * ```
+	   */
+	  static fromBuffer(buffer: Buffer, options: Omit<SeshatOptions, "words"> = {}): Seshat {
+		  if (!Buffer.isBuffer(buffer)) {
+			  throw new TypeError("Argument must be a Buffer");
+		  }
+		  const trie = new Seshat(options);
+		  trie.insertFromBuffer(buffer);
+		  return trie;
 	  }
 
 	  /**

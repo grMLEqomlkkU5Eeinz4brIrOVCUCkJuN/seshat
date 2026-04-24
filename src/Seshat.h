@@ -22,6 +22,8 @@ class Seshat : public Napi::ObjectWrap<Seshat> {
 		const Napi::CallbackInfo
 			&info); // this is primarily used for benchmarking and testing
 	Napi::Value InsertFromFileAsync(const Napi::CallbackInfo &info);
+	Napi::Value InsertFromBuffer(const Napi::CallbackInfo &info);
+	Napi::Value ToBuffer(const Napi::CallbackInfo &info);
 	Napi::Value Search(const Napi::CallbackInfo &info);
 	Napi::Value SearchBatch(const Napi::CallbackInfo &info);
 	Napi::Value StartsWith(const Napi::CallbackInfo &info);

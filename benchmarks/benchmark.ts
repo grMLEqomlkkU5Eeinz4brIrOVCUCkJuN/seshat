@@ -168,6 +168,13 @@ function runStableBenchmarks(): void {
 		trie.insertBatch(testWords);
 	}, 20, 10, 10);
 
+	// Buffer insertions
+	const bufferPayload = Buffer.from(testWords.join("\n") + "\n");
+	batchBench.timeStable("Buffer Insert 100", () => {
+		const trie = new Seshat();
+		trie.insertFromBuffer(bufferPayload);
+	}, 20, 10, 10);
+
 	// Setup for search tests
 	const searchTrie = new Seshat();
 	searchTrie.insertBatch(testWords);

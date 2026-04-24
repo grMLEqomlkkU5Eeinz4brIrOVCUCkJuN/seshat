@@ -19,13 +19,15 @@ npm install seshat-trie
 ```
 
 ## Performance-Notes
-Due to N-API overhead when crossing the JavaScript/C++ boundary, individual operations (especially small batch inserts) may be slower than expected on some systems (higher single-core performance is better for this library). For bulk insertions, use insertFromFile() or insertFromFileAsync() which handle file I/O entirely in C++, avoiding per-word marshalling costs.
+Due to N-API overhead when crossing the JavaScript/C++ boundary, individual operations (especially small batch inserts) may be slower than expected on some systems (higher single-core performance is better for this library). For bulk insertions, use `insertFromFile()`, `insertFromBuffer()`, or `insertFromStream()` which bypass per-word N-API marshalling. For serialization, `toBuffer()`/`fromBuffer()` are significantly faster than `toJSON()`/`fromJSON()` (5.7x export, 3.1x import on 3M words).
 
 ## Benchmarks
 
 Honestly a little nervous about this, but there is a [Benchmarks results file](./benchmarks/benchmark.md). Hope you enjoy this repo. (I felt like this project may have under performed in some ways I did not expect after working on the C++ version)
 
-## JSON import sample schema
+## Data format samples
+
+### JSON format (used by `toJSON`/`fromJSON`)
 
 ```json
 {
@@ -44,6 +46,18 @@ Honestly a little nervous about this, but there is a [Benchmarks results file](.
 		"ignoreCase": false
 	}
 }
+```
+
+### Buffer format (used by `toBuffer`/`fromBuffer`/`insertFromBuffer`/`insertFromStream`)
+
+Newline-delimited UTF-8 text — the same format as the text files used by `insertFromFile`:
+
+```
+aa
+aah
+aahed
+aahing
+aahs
 ```
 
 ### OS prerequisites for local compilation
@@ -85,11 +99,17 @@ console.log(trie.getWordsWithPrefix("he")); // ["help", "hello"]
 // Default buffer size is 1MB; you can pass a custom number of bytes as 2nd arg
 // const count = trie.insertFromFile("./words.txt", 1024);
 
-// Async variant (Node-style callback)
-// trie.insertFromFileAsync("./words.txt", 1024, (err, count) => {
-//   if (err) return console.error(err);
-//   console.log("inserted", count);
-// });
+// Insert from a Buffer (bypasses per-word N-API overhead)
+// const buf = fs.readFileSync("./words.txt");
+// const count = trie.insertFromBuffer(buf);
+
+// Insert from a Readable stream (handles chunk boundaries automatically)
+// const count = await trie.insertFromStream(fs.createReadStream("./words.txt"));
+
+// Fast binary serialization (5-6x faster export, 3x faster import vs JSON)
+// const buf = trie.toBuffer();
+// fs.writeFileSync("./trie.dat", buf);
+// const restored = Seshat.fromBuffer(fs.readFileSync("./trie.dat"));
 ```
 
 ## API
@@ -106,6 +126,8 @@ Methods are synchronous unless noted.
 - **insertBatch(words: string[]): number** returns count inserted
 - **insertFromFile(filePath: string, bufferSize?: number): number** words per line
 - **insertFromFileAsync(filePath: string, bufferSize?: number, cb: (err: Error | null, count?: number) => void): void**
+- **insertFromBuffer(buffer: Buffer): number** bulk insert from a newline-delimited Buffer, bypassing per-word N-API overhead
+- **insertFromStream(stream: Readable): Promise\<number\>** insert from a Readable stream with automatic chunk-boundary handling
 
 - **search(word: string): boolean**
 - **searchBatch(words: string[]): boolean[]**
@@ -128,7 +150,9 @@ Methods are synchronous unless noted.
 - **patternSearch(pattern: string): string[]** supports `*` and `?` wildcards
 
 - **toJSON(): { words: string[]; options: { ignoreCase: boolean } }**
+- **toBuffer(): Buffer** serialize to a newline-delimited Buffer (5-6x faster than toJSON)
 - **static fromJSON(json): Seshat**
+- **static fromBuffer(buffer: Buffer, options?): Seshat** deserialize from a Buffer (3x faster than fromJSON)
 - **static fromWords(words: string[], options?): Seshat**
 
 ### Errors and validation
@@ -137,16 +161,19 @@ Methods are synchronous unless noted.
 - Non-string inputs throw where a string is required.
 - `insertFromFile` throws if `bufferSize` is not a positive number or file read fails.
 - `insertFromFileAsync` reports errors via the callback `err` parameter.
+- `insertFromBuffer` and `fromBuffer` throw if the argument is not a `Buffer`.
+- `insertFromStream` rejects the returned promise if the stream emits an error.
 
 ### Case handling
 
 When `ignoreCase` is `true`, inputs are lowercased internally for matching, but original casing is preserved. Methods like `getWordsWithPrefix`, `toJSON`, and `patternSearch` return words in their original casing as inserted.
 
-## File input format
+## File / Buffer / Stream input format
 
-- `insertFromFile` reads a UTF-8 text file.
-- One word per line.
-- Default buffer size is 1MB; pass `bufferSize` in bytes to override.
+- `insertFromFile`, `insertFromBuffer`, and `insertFromStream` all expect UTF-8 newline-delimited text (one word per line).
+- Line endings: LF, CRLF, and CR are all supported. Leading/trailing whitespace per line is trimmed.
+- `insertFromFile` default buffer size is 1MB; pass `bufferSize` in bytes to override.
+- `insertFromStream` handles words split across chunk boundaries automatically.
 
 ## Benchmarks (optional)
 

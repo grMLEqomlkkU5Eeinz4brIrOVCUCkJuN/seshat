@@ -1,6 +1,7 @@
 import { Seshat } from "../lib/index";
 import fs from "fs";
 import os from "os";
+import { Readable } from "stream";
 
 describe("Seshat", () => {
 	let trie: Seshat;
@@ -1019,6 +1020,386 @@ describe("Seshat", () => {
 				});
 			});
 		});
+	});
+});
+
+describe("Buffer Operations", () => {
+	describe("insertFromBuffer", () => {
+		test("should insert words from a newline-delimited buffer", () => {
+			const trie = new Seshat();
+			const buf = Buffer.from("hello\nworld\ntest\n");
+			const count = trie.insertFromBuffer(buf);
+
+			expect(count).toBe(3);
+			expect(trie.size()).toBe(3);
+			expect(trie.search("hello")).toBe(true);
+			expect(trie.search("world")).toBe(true);
+			expect(trie.search("test")).toBe(true);
+		});
+
+		test("should handle buffer without trailing newline", () => {
+			const trie = new Seshat();
+			const buf = Buffer.from("hello\nworld\ntest");
+			const count = trie.insertFromBuffer(buf);
+
+			expect(count).toBe(3);
+			expect(trie.size()).toBe(3);
+			expect(trie.search("test")).toBe(true);
+		});
+
+		test("should handle CRLF line endings", () => {
+			const trie = new Seshat();
+			const buf = Buffer.from("hello\r\nworld\r\ntest\r\n");
+			const count = trie.insertFromBuffer(buf);
+
+			expect(count).toBe(3);
+			expect(trie.search("hello")).toBe(true);
+			expect(trie.search("world")).toBe(true);
+			expect(trie.search("test")).toBe(true);
+		});
+
+		test("should skip empty lines", () => {
+			const trie = new Seshat();
+			const buf = Buffer.from("hello\n\n\nworld\n\ntest\n");
+			const count = trie.insertFromBuffer(buf);
+
+			expect(count).toBe(3);
+			expect(trie.size()).toBe(3);
+		});
+
+		test("should trim whitespace from words", () => {
+			const trie = new Seshat();
+			const buf = Buffer.from("  hello  \n  world  \n");
+			const count = trie.insertFromBuffer(buf);
+
+			expect(count).toBe(2);
+			expect(trie.search("hello")).toBe(true);
+			expect(trie.search("world")).toBe(true);
+		});
+
+		test("should handle empty buffer", () => {
+			const trie = new Seshat();
+			const buf = Buffer.from("");
+			const count = trie.insertFromBuffer(buf);
+
+			expect(count).toBe(0);
+			expect(trie.size()).toBe(0);
+		});
+
+		test("should throw for non-buffer argument", () => {
+			const trie = new Seshat();
+			expect(() => trie.insertFromBuffer("not a buffer" as any)).toThrow("Argument must be a Buffer");
+			expect(() => trie.insertFromBuffer(123 as any)).toThrow("Argument must be a Buffer");
+		});
+
+		test("should append to existing trie contents", () => {
+			const trie = new Seshat();
+			trie.insert("existing");
+			const buf = Buffer.from("hello\nworld\n");
+			const count = trie.insertFromBuffer(buf);
+
+			expect(count).toBe(2);
+			expect(trie.size()).toBe(3);
+			expect(trie.search("existing")).toBe(true);
+			expect(trie.search("hello")).toBe(true);
+		});
+
+		test("should handle unicode content", () => {
+			const trie = new Seshat();
+			const buf = Buffer.from("café\nnaïve\nrésumé\n", "utf8");
+			const count = trie.insertFromBuffer(buf);
+
+			expect(count).toBe(3);
+			expect(trie.search("café")).toBe(true);
+			expect(trie.search("naïve")).toBe(true);
+			expect(trie.search("résumé")).toBe(true);
+		});
+
+		test("should handle large buffer", () => {
+			const words = Array.from({ length: 10000 }, (_, i) => `word${i}`);
+			const buf = Buffer.from(words.join("\n") + "\n");
+			const trie = new Seshat();
+
+			const start = process.hrtime.bigint();
+			const count = trie.insertFromBuffer(buf);
+			const end = process.hrtime.bigint();
+			const duration = Number(end - start) / 1000000;
+
+			expect(count).toBe(10000);
+			expect(trie.size()).toBe(10000);
+			expect(trie.search("word0")).toBe(true);
+			expect(trie.search("word9999")).toBe(true);
+			expect(duration).toBeLessThan(500);
+		});
+	});
+
+	describe("toBuffer", () => {
+		test("should serialize empty trie to empty buffer", () => {
+			const trie = new Seshat();
+			const buf = trie.toBuffer();
+
+			expect(Buffer.isBuffer(buf)).toBe(true);
+			expect(buf.length).toBe(0);
+		});
+
+		test("should serialize trie to newline-delimited buffer", () => {
+			const trie = new Seshat();
+			["hello", "world", "test"].forEach(w => trie.insert(w));
+			const buf = trie.toBuffer();
+
+			expect(Buffer.isBuffer(buf)).toBe(true);
+			const content = buf.toString("utf8");
+			const words = content.split("\n").filter(w => w.length > 0);
+			expect(words).toHaveLength(3);
+			expect(words).toContain("hello");
+			expect(words).toContain("world");
+			expect(words).toContain("test");
+		});
+
+		test("should preserve unicode in serialization", () => {
+			const trie = new Seshat();
+			["café", "naïve"].forEach(w => trie.insert(w));
+			const buf = trie.toBuffer();
+			const words = buf.toString("utf8").split("\n").filter(w => w.length > 0);
+
+			expect(words).toContain("café");
+			expect(words).toContain("naïve");
+		});
+	});
+
+	describe("toBuffer / fromBuffer roundtrip", () => {
+		test("should roundtrip a trie through buffer serialization", () => {
+			const original = new Seshat();
+			["hello", "world", "test", "help", "heap"].forEach(w => original.insert(w));
+
+			const buf = original.toBuffer();
+			const restored = Seshat.fromBuffer(buf);
+
+			expect(restored.size()).toBe(original.size());
+			expect(restored.search("hello")).toBe(true);
+			expect(restored.search("world")).toBe(true);
+			expect(restored.search("test")).toBe(true);
+			expect(restored.search("help")).toBe(true);
+			expect(restored.search("heap")).toBe(true);
+			expect(restored.search("missing")).toBe(false);
+		});
+
+		test("should roundtrip empty trie", () => {
+			const original = new Seshat();
+			const buf = original.toBuffer();
+			const restored = Seshat.fromBuffer(buf);
+
+			expect(restored.size()).toBe(0);
+			expect(restored.isEmpty()).toBe(true);
+		});
+
+		test("should roundtrip large trie", () => {
+			const words = Array.from({ length: 5000 }, (_, i) => `word${i}`);
+			const original = Seshat.fromWords(words);
+
+			const buf = original.toBuffer();
+			const restored = Seshat.fromBuffer(buf);
+
+			expect(restored.size()).toBe(5000);
+			expect(restored.search("word0")).toBe(true);
+			expect(restored.search("word4999")).toBe(true);
+			expect(restored.search("word5000")).toBe(false);
+		});
+
+		test("should accept options in fromBuffer", () => {
+			const original = new Seshat();
+			["hello", "world"].forEach(w => original.insert(w));
+			const buf = original.toBuffer();
+
+			const restored = Seshat.fromBuffer(buf, { ignoreCase: true });
+			expect(restored.search("HELLO")).toBe(true);
+			expect(restored.search("World")).toBe(true);
+		});
+
+		test("should throw for non-buffer in fromBuffer", () => {
+			expect(() => Seshat.fromBuffer("not a buffer" as any)).toThrow("Argument must be a Buffer");
+		});
+
+		test("fromBuffer should respect maxSize", () => {
+			const buf = Buffer.from("a\nb\nc\nd\ne\n");
+			const trie = Seshat.fromBuffer(buf, { maxSize: 10 });
+			expect(trie.size()).toBe(5);
+		});
+	});
+
+	describe("Buffer vs JSON performance", () => {
+		test("buffer roundtrip should be faster than JSON roundtrip", () => {
+			const words = Array.from({ length: 5000 }, (_, i) => `testword${i}`);
+			const trie = Seshat.fromWords(words);
+
+			// JSON roundtrip
+			const jsonStart = process.hrtime.bigint();
+			const json = trie.toJSON();
+			const _fromJson = Seshat.fromJSON(json);
+			const jsonEnd = process.hrtime.bigint();
+			const jsonTime = Number(jsonEnd - jsonStart);
+
+			// Buffer roundtrip
+			const bufStart = process.hrtime.bigint();
+			const buf = trie.toBuffer();
+			const _fromBuf = Seshat.fromBuffer(buf);
+			const bufEnd = process.hrtime.bigint();
+			const bufTime = Number(bufEnd - bufStart);
+
+			expect(_fromJson.size()).toBe(_fromBuf.size());
+			expect(bufTime).toBeLessThan(jsonTime);
+		});
+	});
+});
+
+describe("Stream Insertion", () => {
+	test("should insert words from a readable stream", async () => {
+		const trie = new Seshat();
+		const stream = Readable.from(["hello\nworld\ntest\n"]);
+		const count = await trie.insertFromStream(stream);
+
+		expect(count).toBe(3);
+		expect(trie.size()).toBe(3);
+		expect(trie.search("hello")).toBe(true);
+		expect(trie.search("world")).toBe(true);
+		expect(trie.search("test")).toBe(true);
+	});
+
+	test("should handle words split across chunks", async () => {
+		const trie = new Seshat();
+		const stream = Readable.from(["hel", "lo\nwor", "ld\ntest\n"]);
+		const count = await trie.insertFromStream(stream);
+
+		expect(count).toBe(3);
+		expect(trie.search("hello")).toBe(true);
+		expect(trie.search("world")).toBe(true);
+		expect(trie.search("test")).toBe(true);
+	});
+
+	test("should handle chunk boundary on newline", async () => {
+		const trie = new Seshat();
+		const stream = Readable.from(["hello\n", "world\n", "test\n"]);
+		const count = await trie.insertFromStream(stream);
+
+		expect(count).toBe(3);
+		expect(trie.search("hello")).toBe(true);
+		expect(trie.search("world")).toBe(true);
+		expect(trie.search("test")).toBe(true);
+	});
+
+	test("should handle last word without trailing newline", async () => {
+		const trie = new Seshat();
+		const stream = Readable.from(["hello\nworld"]);
+		const count = await trie.insertFromStream(stream);
+
+		expect(count).toBe(2);
+		expect(trie.search("hello")).toBe(true);
+		expect(trie.search("world")).toBe(true);
+	});
+
+	test("should handle empty stream", async () => {
+		const trie = new Seshat();
+		const stream = Readable.from([]);
+		const count = await trie.insertFromStream(stream);
+
+		expect(count).toBe(0);
+		expect(trie.isEmpty()).toBe(true);
+	});
+
+	test("should handle single chunk with no newlines", async () => {
+		const trie = new Seshat();
+		const stream = Readable.from(["hello"]);
+		const count = await trie.insertFromStream(stream);
+
+		expect(count).toBe(1);
+		expect(trie.search("hello")).toBe(true);
+	});
+
+	test("should handle string chunks", async () => {
+		const trie = new Seshat();
+		const stream = new Readable({
+			read() {
+				this.push("hello\nworld\n");
+				this.push(null);
+			},
+			encoding: "utf8",
+		});
+		const count = await trie.insertFromStream(stream);
+
+		expect(count).toBe(2);
+		expect(trie.search("hello")).toBe(true);
+		expect(trie.search("world")).toBe(true);
+	});
+
+	test("should handle CRLF across chunk boundary", async () => {
+		const trie = new Seshat();
+		const stream = Readable.from(["hello\r", "\nworld\r\n"]);
+		const count = await trie.insertFromStream(stream);
+
+		expect(count).toBe(2);
+		expect(trie.search("hello")).toBe(true);
+		expect(trie.search("world")).toBe(true);
+	});
+
+	test("should append to existing trie contents", async () => {
+		const trie = new Seshat();
+		trie.insert("existing");
+		const stream = Readable.from(["hello\nworld\n"]);
+		const count = await trie.insertFromStream(stream);
+
+		expect(count).toBe(2);
+		expect(trie.size()).toBe(3);
+		expect(trie.search("existing")).toBe(true);
+	});
+
+	test("should reject on stream error", async () => {
+		const trie = new Seshat();
+		const stream = new Readable({
+			read() {
+				this.destroy(new Error("stream failure"));
+			},
+		});
+
+		await expect(trie.insertFromStream(stream)).rejects.toThrow("stream failure");
+	});
+
+	test("should stream from a file", async () => {
+		const tmpDir = fs.mkdtempSync(`${os.tmpdir()}${require("path").sep}seshat-`);
+		const tmpFile = `${tmpDir}${require("path").sep}stream-words.txt`;
+		fs.writeFileSync(tmpFile, "alpha\nbeta\ngamma\ndelta\n", "utf8");
+
+		try {
+			const trie = new Seshat();
+			const stream = fs.createReadStream(tmpFile);
+			const count = await trie.insertFromStream(stream);
+
+			expect(count).toBe(4);
+			expect(trie.search("alpha")).toBe(true);
+			expect(trie.search("beta")).toBe(true);
+			expect(trie.search("gamma")).toBe(true);
+			expect(trie.search("delta")).toBe(true);
+		} finally {
+			fs.unlinkSync(tmpFile);
+			fs.rmdirSync(tmpDir);
+		}
+	});
+
+	test("should handle many small chunks efficiently", async () => {
+		const words = Array.from({ length: 1000 }, (_, i) => `word${i}`);
+		const chunks = words.map(w => `${w}\n`);
+		const trie = new Seshat();
+
+		const start = process.hrtime.bigint();
+		const stream = Readable.from(chunks);
+		const count = await trie.insertFromStream(stream);
+		const end = process.hrtime.bigint();
+		const duration = Number(end - start) / 1000000;
+
+		expect(count).toBe(1000);
+		expect(trie.size()).toBe(1000);
+		expect(trie.search("word0")).toBe(true);
+		expect(trie.search("word999")).toBe(true);
+		expect(duration).toBeLessThan(1000);
 	});
 });
 

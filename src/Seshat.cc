@@ -26,7 +26,9 @@ Napi::Object Seshat::Init(Napi::Env env, Napi::Object exports) {
 		 InstanceMethod("getHeightStats", &Seshat::GetHeightStats),
 		 InstanceMethod("getMemoryStats", &Seshat::GetMemoryStats),
 		 InstanceMethod("getWordMetrics", &Seshat::GetWordMetrics),
-		 InstanceMethod("patternSearch", &Seshat::PatternSearch)});
+		 InstanceMethod("patternSearch", &Seshat::PatternSearch),
+		 InstanceMethod("insertFromBuffer", &Seshat::InsertFromBuffer),
+		 InstanceMethod("toBuffer", &Seshat::ToBuffer)});
 
 	constructor = Napi::Persistent(func);
 	constructor.SuppressDestruct();
@@ -486,6 +488,48 @@ Napi::Value Seshat::PatternSearch(const Napi::CallbackInfo &info) {
 	} catch (const std::exception &e) {
 		Napi::Error::New(
 			env, std::string("Failed to perform pattern search: ") + e.what())
+			.ThrowAsJavaScriptException();
+		return env.Undefined();
+	}
+}
+
+// InsertFromBuffer method - bulk insert from a Node.js Buffer
+Napi::Value Seshat::InsertFromBuffer(const Napi::CallbackInfo &info) {
+	Napi::Env env = info.Env();
+
+	if (info.Length() < 1 || !info[0].IsBuffer()) {
+		Napi::TypeError::New(env, "Buffer argument expected")
+			.ThrowAsJavaScriptException();
+		return env.Undefined();
+	}
+
+	Napi::Buffer<char> buf = info[0].As<Napi::Buffer<char>>();
+	const char *data = buf.Data();
+	size_t length = buf.Length();
+
+	try {
+		size_t words_inserted = trie_.bulk_insert_from_buffer(data, length);
+		return Napi::Number::New(env, static_cast<double>(words_inserted));
+	} catch (const std::exception &e) {
+		Napi::Error::New(
+			env, std::string("Failed to insert from buffer: ") + e.what())
+			.ThrowAsJavaScriptException();
+		return env.Undefined();
+	}
+}
+
+// ToBuffer method - serialize trie to a newline-delimited Buffer
+Napi::Value Seshat::ToBuffer(const Napi::CallbackInfo &info) {
+	Napi::Env env = info.Env();
+
+	try {
+		std::string serialized = trie_.serialize_to_buffer();
+		return Napi::Buffer<char>::Copy(env, serialized.data(),
+										serialized.size());
+	} catch (const std::exception &e) {
+		Napi::Error::New(env,
+						 std::string("Failed to serialize to buffer: ") +
+							 e.what())
 			.ThrowAsJavaScriptException();
 		return env.Undefined();
 	}

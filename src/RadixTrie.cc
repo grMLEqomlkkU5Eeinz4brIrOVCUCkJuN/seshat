@@ -175,6 +175,73 @@ size_t RadixTrie::bulk_insert_from_file(const std::string &path,
 	return words_inserted;
 }
 
+size_t RadixTrie::bulk_insert_from_buffer(const char *data, size_t length) {
+	size_t words_inserted = 0;
+	size_t line_start = 0;
+
+	for (size_t i = 0; i < length; ++i) {
+		char c = data[i];
+		if (c == '\n' || c == '\r') {
+			size_t seg_len = i - line_start;
+			if (seg_len > 0) {
+				const char *seg_ptr = data + line_start;
+				size_t b = 0, e = seg_len;
+				while (e > b &&
+					   std::isspace(static_cast<unsigned char>(seg_ptr[e - 1])))
+					--e;
+				while (b < e &&
+					   std::isspace(static_cast<unsigned char>(seg_ptr[b])))
+					++b;
+				if (e > b) {
+					std::string_view word_view(seg_ptr + b, e - b);
+					insert(word_view);
+					++words_inserted;
+				}
+			}
+			while (i + 1 < length &&
+				   (data[i + 1] == '\n' || data[i + 1] == '\r'))
+				++i;
+			line_start = i + 1;
+		}
+	}
+
+	if (line_start < length) {
+		const char *seg_ptr = data + line_start;
+		size_t seg_len = length - line_start;
+		size_t b = 0, e = seg_len;
+		while (e > b &&
+			   std::isspace(static_cast<unsigned char>(seg_ptr[e - 1])))
+			--e;
+		while (b < e && std::isspace(static_cast<unsigned char>(seg_ptr[b])))
+			++b;
+		if (e > b) {
+			std::string_view word_view(seg_ptr + b, e - b);
+			insert(word_view);
+			++words_inserted;
+		}
+	}
+
+	return words_inserted;
+}
+
+std::string RadixTrie::serialize_to_buffer() const {
+	std::string output;
+	if (empty())
+		return output;
+
+	std::vector<std::string> words = words_with_prefix("");
+	size_t total_size = 0;
+	for (const auto &w : words)
+		total_size += w.size() + 1;
+	output.reserve(total_size);
+
+	for (const auto &w : words) {
+		output.append(w);
+		output.push_back('\n');
+	}
+	return output;
+}
+
 void RadixTrie::collect_words_from_node(
 	const RadixNode *node, const std::string &prefix,
 	std::vector<std::string> &result) const {

@@ -1,9 +1,12 @@
+# Benchmark Results
+
 Linux 6.19.11-arch1-1
 
-# Main Benchmarks
+## Main Benchmarks
 
 Run 1:
-```
+
+```text
 > seshat-trie@1.0.1 benchmark
 > ts-node benchmarks/benchmark.ts
 
@@ -83,7 +86,8 @@ Recommendations:
 ```
 
 Run 2:
-```
+
+```text
 > seshat-trie@1.0.1 benchmark
 > ts-node benchmarks/benchmark.ts
 
@@ -163,10 +167,11 @@ Recommendations:
   5. Let laptop cool down if warm
 ```
 
-# File Streaming Benches
+## File Streaming Benches
 
-Run 1:
-```
+Run 1 (terms.txt):
+
+```text
 // Terms.txt file from https://github.com/wolfgarbe/PruningRadixTrie/tree/master/PruningRadixTrie
 > seshat-trie@1.0.1 benchmark:filestream
 > ts-node benchmarks/filestream.ts
@@ -190,8 +195,9 @@ Trie imported from JSON.
 Import from JSON time: 2842.91 ms
 ```
 
-Run 2:
-```
+Run 2 (terms.txt):
+
+```text
 // Terms.txt file from https://github.com/wolfgarbe/PruningRadixTrie/tree/master/PruningRadixTrie
 > seshat-trie@1.0.1 benchmark:filestream
 > ts-node benchmarks/filestream.ts
@@ -215,8 +221,9 @@ Trie imported from JSON.
 Import from JSON time: 2842.03 ms
 ```
 
-// Enable Text file
-```
+enable1.txt:
+
+```text
 > seshat-trie@1.0.1 benchmark:filestream
 > ts-node benchmarks/filestream.ts
 
@@ -239,8 +246,9 @@ Trie imported from JSON.
 Import from JSON time: 80.54 ms
 ```
 
-// words.txt
-```
+words.txt:
+
+```text
 > seshat-trie@1.0.1 benchmark:filestream
 > ts-node benchmarks/filestream.ts
 
@@ -263,8 +271,9 @@ Trie imported from JSON.
 Import from JSON time: 1460.10 ms
 ```
 
-// Google's bad word list
-```
+badwords.txt:
+
+```text
 > seshat-trie@1.0.1 benchmark:filestream
 > ts-node benchmarks/filestream.ts
 
@@ -286,3 +295,113 @@ Export to JSON time: 0.27 ms
 Trie imported from JSON.
 Import from JSON time: 0.43 ms
 ```
+
+## Buffer & Stream Benchmarks
+
+Linux 6.19.14-arch1-1
+
+### Main Benchmarks (with Buffer Insert)
+
+```text
+Seshat Stable Performance Benchmarks
+=====================================
+Using multiple runs with warm-up and statistical analysis
+CV% = Coefficient of Variation (lower is more stable)
+
+=== Analytics Methods ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+getHeightStats           148,830        128,799     36.1    94523-249043
+getMemoryStats           419,340        447,081     14.9    306695-497926
+getWordMetrics           102,203        104,133     7.4     87555-113928
+patternSearch('*a*')     279,501        305,251     15.3    216687-340035
+
+=== Core Operations ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+Insert                   685,536        696,046     11.1    433130-749262
+Search (hit)             3,301,008      3,513,617   16.2    1658199-3645444
+Search (miss)            3,541,125      3,717,486   11.5    2500269-3883329
+
+=== Batch vs Individual ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+Individual Insert 100    21,732         22,454      6.4     18703-22814
+Batch Insert 100         17,789         17,766      15.8    11602-21562
+Buffer Insert 100        74,402         78,726      11.2    51657-79277
+Individual Search 100    27,120         27,391      4.4     24794-28455
+Batch Search 100         17,022         17,278      2.7     15904-17557
+
+=== System Stability Check ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+CPU Stability            281,653        283,054     0.7     276132-283082
+```
+
+Buffer Insert is ~4.2x faster than Batch Insert and ~3.4x faster than Individual Insert
+for 100-word batches, by bypassing per-word N-API marshalling.
+
+### File Streaming & Serialization (words.txt — 3M words)
+
+```text
+Seshat File-Streaming Benchmark
+==============================
+
+--- insertFromFile ---
+Words inserted: 3080821
+Time taken: 2372.01 ms
+bufferSize: 16777216 bytes
+Memory Stats: {
+  "totalBytes": "280.80 MB",
+  "nodeCount": "3.43 MB",
+  "stringBytes": "6.73 MB",
+  "overheadBytes": "274.07 MB",
+  "bytesPerWord": "95.57179953006033 B"
+}
+Node count: 3592260
+
+--- JSON serialization ---
+Export to JSON time: 2824.85 ms
+Import from JSON time: 3624.97 ms
+Verified word count: 3080821
+
+--- Buffer serialization ---
+Export to Buffer time: 497.23 ms
+Buffer size: 27.46 MB
+Import from Buffer time: 1168.30 ms
+Verified word count: 3080821
+
+--- insertFromBuffer ---
+Words inserted: 3080821
+Time taken: 1187.21 ms
+
+--- insertFromStream ---
+Words inserted: 3080821
+Time taken: 2269.48 ms
+
+--- Summary ---
+Method                          Time (ms)      Words
+----------------------------------------------------
+insertFromFile                    2372.01    3080821
+insertFromBuffer                  1187.21    3080821
+insertFromStream                  2269.48    3080821
+JSON export                       2824.85
+JSON import                       3624.97    3080821
+Buffer export (toBuffer)           497.23
+Buffer import (fromBuffer)        1168.30    3080821
+```
+
+### Serialization speedup vs JSON (3M words)
+
+| Operation | JSON    | Buffer  | Speedup  |
+|-----------|---------|---------|----------|
+| Export    | 2825 ms | 497 ms  | **5.7x** |
+| Import    | 3625 ms | 1168 ms | **3.1x** |
+
+### Insertion method comparison (3M words)
+
+| Method           | Time    | Notes                                 |
+|------------------|---------|---------------------------------------|
+| insertFromBuffer | 1187 ms | Fastest — data already in memory      |
+| insertFromStream | 2270 ms | Streams from disk, chunk-by-chunk     |
+| insertFromFile   | 2372 ms | C++ file I/O with configurable buffer |
