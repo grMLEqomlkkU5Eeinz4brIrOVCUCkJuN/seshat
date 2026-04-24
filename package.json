@@ -24,7 +24,7 @@
 		"format:cc": "find . -name \"*.cc\" -exec clang-format -i {} \\;",
 		"format:all": "find . \\( -name \"*.cc\" -o -name \"*.cpp\" -o -name \"*.h\" \\) -exec clang-format -i {} \\;",
 		"format": "find . \\( -name \"*.cc\" -o -name \"*.cpp\" -o -name \"*.h\" \\) -exec clang-format -i {} \\; && eslint . --fix",
-		"setupTextFiles": "mkdir textfiles && cd textfiles && wget https://norvig.com/ngrams/enable1.txt && wget https://raw.githubusercontent.com/ScriptSmith/topwords/master/words.txt && wget https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/badwordslist/badwords.txt",
+		"setupTextFiles": "mkdir textfiles && cd textfiles && wget https://norvig.com/ngrams/enable1.txt && wget https://raw.githubusercontent.com/ScriptSmith/topwords/master/words.txt && wget https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/badwordslist/badwords.txt && wget https://raw.githubusercontent.com/grMLEqomlkkU5Eeinz4brIrOVCUCkJuN/terms.txt/refs/heads/master/terms.txt",
 		"prebuildify": "prebuildify --napi --strip",
 		"benchmark:filestream": "ts-node benchmarks/filestream.ts",
 		"benchmark": "ts-node benchmarks/benchmark.ts"
