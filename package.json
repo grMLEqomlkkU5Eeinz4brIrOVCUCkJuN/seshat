@@ -26,8 +26,8 @@
 		"format": "find . \\( -name \"*.cc\" -o -name \"*.cpp\" -o -name \"*.h\" \\) -exec clang-format -i {} \\; && eslint . --fix",
 		"setupTextFiles": "mkdir textfiles && cd textfiles && wget https://norvig.com/ngrams/enable1.txt && wget https://raw.githubusercontent.com/ScriptSmith/topwords/master/words.txt && wget https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/badwordslist/badwords.txt && wget https://raw.githubusercontent.com/grMLEqomlkkU5Eeinz4brIrOVCUCkJuN/terms.txt/refs/heads/master/terms.txt",
 		"prebuildify": "prebuildify --napi --strip",
-		"benchmark:filestream": "ts-node benchmarks/filestream.ts",
-		"benchmark": "ts-node benchmarks/benchmark.ts"
+		"benchmark:filestream": "tsx benchmarks/filestream.ts",
+		"benchmark": "tsx benchmarks/benchmark.ts"
 	},
 	"gypfile": true,
 	"keywords": [
@@ -59,7 +59,7 @@
 		"nodemon": "^3.1.10",
 		"prebuildify": "^6.0.1",
 		"ts-jest": "^29.4.4",
-		"ts-node": "^10.9.2",
+		"tsx": "^4.21.0",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.46.0"
 	},

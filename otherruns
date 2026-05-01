@@ -1,0 +1,376 @@
+[runner@lupin seshat]$ npm setupTextFiles
+Unknown command: "setupTextFiles"
+
+
+Did you mean this?
+  npm run setupTextFiles # run the "setupTextFiles" package script
+To see a list of supported npm commands, run:
+  npm help
+[runner@lupin seshat]$ npm run setupTextFiles
+
+> seshat-trie@1.0.6 setupTextFiles
+> mkdir textfiles && cd textfiles && wget https://norvig.com/ngrams/enable1.txt && wget https://raw.githubusercontent.com/ScriptSmith/topwords/master/words.txt && wget https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/badwordslist/badwords.txt && wget https://raw.githubusercontent.com/grMLEqomlkkU5Eeinz4brIrOVCUCkJuN/terms.txt/refs/heads/master/terms.txt
+
+--2026-04-24 20:59:51--  https://norvig.com/ngrams/enable1.txt
+Loaded CA certificate '/etc/ssl/certs/ca-certificates.crt'
+Resolving norvig.com (norvig.com)... 158.106.138.13
+Connecting to norvig.com (norvig.com)|158.106.138.13|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 1743327 (1.7M) [text/plain]
+Saving to: ‘enable1.txt’
+
+enable1.txt                  100%[==============================================>]   1.66M   542KB/s    in 3.1s    
+
+2026-04-24 20:59:56 (542 KB/s) - ‘enable1.txt’ saved [1743327/1743327]
+
+--2026-04-24 20:59:56--  https://raw.githubusercontent.com/ScriptSmith/topwords/master/words.txt
+Loaded CA certificate '/etc/ssl/certs/ca-certificates.crt'
+Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 185.199.109.133, 185.199.110.133, 185.199.111.133, ...
+Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|185.199.109.133|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 28790837 (27M) [text/plain]
+Saving to: ‘words.txt’
+
+words.txt                    100%[==============================================>]  27.46M   104MB/s    in 0.3s    
+
+2026-04-24 20:59:58 (104 MB/s) - ‘words.txt’ saved [28790837/28790837]
+
+--2026-04-24 20:59:58--  https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/badwordslist/badwords.txt
+Loaded CA certificate '/etc/ssl/certs/ca-certificates.crt'
+Resolving storage.googleapis.com (storage.googleapis.com)... 64.233.170.207, 172.253.134.207, 172.217.194.207, ...
+Connecting to storage.googleapis.com (storage.googleapis.com)|64.233.170.207|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 3686 (3.6K) [application/octet-stream]
+Saving to: ‘badwords.txt’
+
+badwords.txt                 100%[==============================================>]   3.60K  --.-KB/s    in 0s      
+
+2026-04-24 20:59:59 (9.71 MB/s) - ‘badwords.txt’ saved [3686/3686]
+
+--2026-04-24 20:59:59--  https://raw.githubusercontent.com/grMLEqomlkkU5Eeinz4brIrOVCUCkJuN/terms.txt/refs/heads/master/terms.txt
+Loaded CA certificate '/etc/ssl/certs/ca-certificates.crt'
+Resolving raw.githubusercontent.com (raw.githubusercontent.com)... 185.199.109.133, 185.199.111.133, 185.199.108.133, ...
+Connecting to raw.githubusercontent.com (raw.githubusercontent.com)|185.199.109.133|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 101840231 (97M) [text/plain]
+Saving to: ‘terms.txt’
+
+terms.txt                    100%[==============================================>]  97.12M   110MB/s    in 0.9s    
+
+2026-04-24 21:00:04 (110 MB/s) - ‘terms.txt’ saved [101840231/101840231]
+
+[runner@lupin seshat]$ npm run benchmark
+
+> seshat-trie@1.0.6 benchmark
+> ts-node benchmarks/benchmark.ts
+
+Seshat Stable Performance Benchmarks
+=====================================
+Using multiple runs with warm-up and statistical analysis
+CV% = Coefficient of Variation (lower is more stable)
+  Running: getHeightStats
+  Warming up...
+  Running: getMemoryStats
+  Warming up...
+  Running: getWordMetrics
+  Warming up...
+  Running: patternSearch('*a*')
+  Warming up...
+
+=== Analytics Methods ===
+Test Name                Mean Ops/sec   Median      CV%     Range               
+--------------------------------------------------------------------------------
+getHeightStats           264,000        275,104     6.2     237123-281477       
+getMemoryStats           450,639        474,176     6.5     398096-479354       
+getWordMetrics           235,515        231,559     6.4     213243-253474       
+patternSearch('*a*')     387,306        401,965     6.1     345447-402951       
+  Running: Insert
+  Warming up...
+  Running: Search (hit)
+  Warming up...
+  Running: Search (miss)
+  Warming up...
+
+=== Core Operations ===
+Test Name                Mean Ops/sec   Median      CV%     Range               
+--------------------------------------------------------------------------------
+Insert                   792,254        903,457     25.5    339819-965405       
+Search (hit)             3,154,175      3,665,931   28.6    1041789-3917804     
+Search (miss)            3,506,343      3,415,639   12.8    2754745-3989022     
+  Running: Individual Insert 100
+  Warming up...
+  Running: Batch Insert 100
+  Warming up...
+  Running: Buffer Insert 100
+  Warming up...
+  Running: Individual Search 100
+  Warming up...
+  Running: Batch Search 100
+  Warming up...
+
+=== Batch vs Individual ===
+Test Name                Mean Ops/sec   Median      CV%     Range               
+--------------------------------------------------------------------------------
+Individual Insert 100    25,188         24,900      9.4     21174-29005         
+Batch Insert 100         21,552         22,368      19.5    11601-25228         
+Buffer Insert 100        78,228         83,618      12.1    59107-84507         
+Individual Search 100    27,701         30,390      27.3    14585-35076         
+Batch Search 100         20,591         22,552      19.9    11054-23609         
+  Running: CPU Stability
+  Warming up...
+
+=== System Stability Check ===
+Test Name                Mean Ops/sec   Median      CV%     Range               
+--------------------------------------------------------------------------------
+CPU Stability            489,372        499,124     5.0     415344-499229       
+
+=== Variance Analysis ===
+CV% < 5%:  Excellent stability
+CV% 5-10%: Good stability
+CV% 10-20%: Moderate variance
+CV% > 20%: High variance (system load/thermal throttling)
+
+High Variance Detected:
+  - Insert: 25.5% CV
+  - Search (hit): 28.6% CV
+  - Batch Insert 100: 19.5% CV
+  - Individual Search 100: 27.3% CV
+  - Batch Search 100: 19.9% CV
+
+Recommendations:
+  1. Close unnecessary applications
+  2. Ensure laptop is plugged in (not on battery)
+  3. Set Windows power plan to 'High Performance'
+  4. Run: node --expose-gc benchmark/stable-benchmark.ts
+  5. Let laptop cool down if warm
+[runner@lupin seshat]$ npm run benchmark:filestream
+
+> seshat-trie@1.0.6 benchmark:filestream
+> ts-node benchmarks/filestream.ts
+
+Seshat File-Streaming Benchmark
+==============================
+
+--- insertFromFile ---
+Words inserted: 6273234
+Time taken: 3492.34 ms
+bufferSize: 16777216 bytes
+Memory Stats: {
+  "totalBytes": "734.96 MB",
+  "nodeCount": "8.69 MB",
+  "stringBytes": "39.38 MB",
+  "overheadBytes": "695.58 MB",
+  "bytesPerWord": "122.84912311576453 B"
+}
+Node count: 9117043
+
+--- JSON serialization ---
+Export to JSON time: 7580.98 ms
+Import from JSON time: 7039.66 ms
+Verified word count: 6273234
+
+--- Buffer serialization ---
+Export to Buffer time: 1380.75 ms
+Buffer size: 91.14 MB
+Import from Buffer time: 2538.74 ms
+Verified word count: 6273234
+
+--- insertFromBuffer ---
+Words inserted: 6273234
+Time taken: 2598.35 ms
+
+--- insertFromStream ---
+Words inserted: 6273234
+Time taken: 5451.46 ms
+
+--- Summary ---
+Method                          Time (ms)      Words
+----------------------------------------------------
+insertFromFile                    3492.34    6273234
+insertFromBuffer                  2598.35    6273234
+insertFromStream                  5451.46    6273234
+JSON export                       7580.98
+JSON import                       7039.66    6273234
+Buffer export (toBuffer)          1380.75
+Buffer import (fromBuffer)        2538.74    6273234
+[runner@lupin seshat]$ neofetch
+                   -`                    runner@lupin 
+                  .o+`                   ------------ 
+                 `ooo/                   OS: Arch Linux x86_64 
+                `+oooo:                  Host: Latitude E5470 
+               `+oooooo:                 Kernel: 6.17.5-arch1-1 
+               -+oooooo+:                Uptime: 175 days, 1 hour, 4 mins 
+             `/:-:++oooo+:               Packages: 592 (pacman) 
+            `/++++/+++++++:              Shell: bash 5.3.9 
+           `/++++++++++++++:             Resolution: 1366x768 
+          `/+++ooooooooooooo/`           Terminal: /dev/pts/0 
+         ./ooosssso++osssssso+`          CPU: Intel i5-6300U (4) @ 3.000GHz 
+        .oossssso-````/ossssss+`         GPU: Intel Skylake-U GT2 [HD Graphics 520] 
+       -osssssso.      :ssssssso.        Memory: 3598MiB / 15646MiB 
+      :osssssss/        osssso+++.
+     /ossssssss/        +ssssooo/-                               
+   `/ossssso+/:-        -:/+osssso+-                             
+  `+sso+:-`                 `.-/+oso:
+ `++:.                           `-/+/
+ .`                                 `/
+
+[runner@lupin seshat]$ 
+
+
+runner@v36895:~/seshat$ npm run benchmark
+
+> seshat-trie@1.0.6 benchmark
+> ts-node benchmarks/benchmark.ts
+
+Seshat Stable Performance Benchmarks
+=====================================
+Using multiple runs with warm-up and statistical analysis
+CV% = Coefficient of Variation (lower is more stable)
+  Running: getHeightStats
+  Warming up...
+  Running: getMemoryStats
+  Warming up...
+  Running: getWordMetrics
+  Warming up...
+  Running: patternSearch('*a*')
+  Warming up...
+
+=== Analytics Methods ===
+Test Name                Mean Ops/sec   Median      CV%     Range               
+--------------------------------------------------------------------------------
+getHeightStats           139,406        142,906     8.8     119357-157085       
+getMemoryStats           261,048        260,605     7.8     234335-303575       
+getWordMetrics           115,948        116,061     5.8     103773-126306       
+patternSearch('*a*')     177,176        173,523     19.9    126301-233749       
+  Running: Insert
+  Warming up...
+  Running: Search (hit)
+  Warming up...
+  Running: Search (miss)
+  Warming up...
+
+=== Core Operations ===
+Test Name                Mean Ops/sec   Median      CV%     Range               
+--------------------------------------------------------------------------------
+Insert                   310,319        322,710     22.6    193992-423672       
+Search (hit)             1,394,550      1,474,033   31.0    649478-2223176      
+Search (miss)            1,559,723      1,550,705   19.9    1115090-2183993     
+  Running: Individual Insert 100
+  Warming up...
+  Running: Batch Insert 100
+  Warming up...
+  Running: Buffer Insert 100
+  Warming up...
+  Running: Individual Search 100
+  Warming up...
+  Running: Batch Search 100
+  Warming up...
+
+=== Batch vs Individual ===
+Test Name                Mean Ops/sec   Median      CV%     Range               
+--------------------------------------------------------------------------------
+Individual Insert 100    11,168         10,035      29.0    8505-19222          
+Batch Insert 100         11,555         11,922      10.4    9294-13478          
+Buffer Insert 100        28,215         27,938      11.7    23450-32774         
+Individual Search 100    15,284         15,288      16.2    11635-20389         
+Batch Search 100         8,294          8,569       10.6    6965-9741           
+  Running: CPU Stability
+  Warming up...
+
+=== System Stability Check ===
+Test Name                Mean Ops/sec   Median      CV%     Range               
+--------------------------------------------------------------------------------
+CPU Stability            434,318        446,905     7.2     360554-468916       
+
+=== Variance Analysis ===
+CV% < 5%:  Excellent stability
+CV% 5-10%: Good stability
+CV% 10-20%: Moderate variance
+CV% > 20%: High variance (system load/thermal throttling)
+
+High Variance Detected:
+  - Insert: 22.6% CV
+  - Search (hit): 31.0% CV
+  - Search (miss): 19.9% CV
+  - Individual Insert 100: 29.0% CV
+  - Individual Search 100: 16.2% CV
+
+Recommendations:
+  1. Close unnecessary applications
+  2. Ensure laptop is plugged in (not on battery)
+  3. Set Windows power plan to 'High Performance'
+  4. Run: node --expose-gc benchmark/stable-benchmark.ts
+  5. Let laptop cool down if warm
+runner@v36895:~/seshat$ npm run benchmark:filestream
+
+> seshat-trie@1.0.6 benchmark:filestream
+> ts-node benchmarks/filestream.ts
+
+Seshat File-Streaming Benchmark
+==============================
+
+--- insertFromFile ---
+Words inserted: 6273234
+Time taken: 6342.72 ms
+bufferSize: 16777216 bytes
+Memory Stats: {
+  "totalBytes": "734.96 MB",
+  "nodeCount": "8.69 MB",
+  "stringBytes": "39.38 MB",
+  "overheadBytes": "695.58 MB",
+  "bytesPerWord": "122.84912311576453 B"
+}
+Node count: 9117043
+
+--- JSON serialization ---
+Export to JSON time: 18418.41 ms
+Import from JSON time: 15457.35 ms
+Verified word count: 6273234
+
+--- Buffer serialization ---
+Export to Buffer time: 4955.50 ms
+Buffer size: 91.14 MB
+Import from Buffer time: 11863.56 ms
+Verified word count: 6273234
+
+--- insertFromBuffer ---
+Words inserted: 6273234
+Time taken: 15419.47 ms
+
+--- insertFromStream ---
+Words inserted: 6273234
+Time taken: 19271.93 ms
+
+--- Summary ---
+Method                          Time (ms)      Words
+----------------------------------------------------
+insertFromFile                    6342.72    6273234
+insertFromBuffer                 15419.47    6273234
+insertFromStream                 19271.93    6273234
+JSON export                      18418.41
+JSON import                      15457.35    6273234
+Buffer export (toBuffer)          4955.50
+Buffer import (fromBuffer)       11863.56    6273234
+runner@v36895:~/seshat$ neofetch
+            .-/+oossssoo+/-.               runner@v36895 
+        `:+ssssssssssssssssss+:`           ------------- 
+      -+ssssssssssssssssssyyssss+-         OS: Ubuntu 24.04.4 LTS x86_64 
+    .ossssssssssssssssssdMMMNysssso.       Host: KVM/QEMU (Standard PC (i440FX + PIIX, 1996) pc-i440fx-9.2) 
+   /ssssssssssshdmmNNmmyNMMMMhssssss/      Kernel: 6.8.0-107-generic 
+  +ssssssssshmydMMMMMMMNddddyssssssss+     Uptime: 9 days, 22 hours, 16 mins 
+ /sssssssshNMMMyhhyyyyhmNMMMNhssssssss/    Packages: 1459 (dpkg) 
+.ssssssssdMMMNhsssssssssshNMMMdssssssss.   Shell: bash 5.2.21 
++sssshhhyNMMNyssssssssssssyNMMMysssssss+   Terminal: /dev/pts/0 
+ossyNMMMNyMMhsssssssssssssshmmmhssssssso   CPU: Intel Xeon Gold 6150 (4) @ 2.699GHz 
+ossyNMMMNyMMhsssssssssssssshmmmhssssssso   GPU: 00:02.0 Vendor 1234 Device 1111 
++sssshhhyNMMNyssssssssssssyNMMMysssssss+   Memory: 2487MiB / 15993MiB 
+.ssssssssdMMMNhsssssssssshNMMMdssssssss.
+ /sssssssshNMMMyhhyyyyhdNMMMNhssssssss/                            
+  +sssssssssdmydMMMMMMMMddddyssssssss+                             
+   /ssssssssssshdmNNNNmyNMMMMhssssss/
+    .ossssssssssssssssssdMMMNysssso.
+      -+sssssssssssssssssyyyssss+-
+        `:+ssssssssssssssssss+:`
+            .-/+oossssoo+/-.
+
+runner@v36895:~/seshat$ 
