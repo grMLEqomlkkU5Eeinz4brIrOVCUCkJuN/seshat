@@ -49,10 +49,13 @@ class RadixTrie {
 	};
 
 	struct MemoryStats {
-		size_t total_bytes;
+		size_t total_bytes;		   // structs + every heap buffer requested
 		size_t node_count;
-		size_t string_bytes;
-		size_t overhead_bytes;
+		size_t string_bytes;	   // raw character payload (sum of key sizes)
+		size_t struct_bytes;	   // node_count * sizeof(RadixNode)
+		size_t child_buffer_bytes; // heap backing arrays for children vectors
+		size_t string_buffer_bytes; // heap for non-SSO key allocations
+		size_t overhead_bytes;	   // total_bytes - string_bytes
 		double bytes_per_word;
 	};
 

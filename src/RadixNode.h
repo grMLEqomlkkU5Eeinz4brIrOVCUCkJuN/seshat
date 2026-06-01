@@ -12,12 +12,8 @@ class RadixNode {
   public:
 	std::string key;
 	bool is_end = false;
-	RadixNode *parent = nullptr;
-	char parent_char = '\0';
 	std::vector<std::pair<char, std::unique_ptr<RadixNode>>> children;
 
 	RadixNode() = default;
 	explicit RadixNode(std::string k) : key(std::move(k)) {}
-	explicit RadixNode(std::string k, RadixNode *p, char pc)
-		: key(std::move(k)), parent(p), parent_char(pc) {}
 };

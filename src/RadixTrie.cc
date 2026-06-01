@@ -273,8 +273,7 @@ void RadixTrie::insert(std::string_view word) {
 		if (it == current->children.end() || it->first != first_char) {
 			// No child with this first character, create new node
 			auto new_node = std::make_unique<RadixNode>(
-				std::string(word.data() + pos, word.length() - pos), current,
-				first_char);
+				std::string(word.data() + pos, word.length() - pos));
 			new_node->is_end = true;
 			current->children.insert(
 				it, std::make_pair(first_char, std::move(new_node)));
@@ -427,10 +426,19 @@ void RadixTrie::cleanup_orphaned_nodes(std::string_view word) {
 	if (word.empty() || !root)
 		return;
 
+	// Record the descent path so we can walk back up without storing a parent
+	// pointer on every node. Each frame is an ancestor and the first character
+	// of the edge taken from it toward the target.
+	struct Frame {
+		RadixNode *parent;
+		char edge_char;
+	};
+	std::vector<Frame> path;
+
 	RadixNode *current = root.get();
 	size_t pos = 0;
 
-	// Find the node to delete
+	// Find the node to delete, recording the path as we descend
 	while (pos < word.length() && current) {
 		char first_char = word[pos];
 		auto it = find_child(current, first_char);
@@ -451,31 +459,27 @@ void RadixTrie::cleanup_orphaned_nodes(std::string_view word) {
 			return; // Keys don't match
 		}
 
+		path.push_back({current, first_char});
 		pos += child_key.length();
 		current = child;
 	}
 
 	// Only clean up if we found the exact node and it's marked as end
-	if (current && current->is_end) {
-		// Clean up from the current node back to the root using parent pointers
-		while (current && current->parent) {
-			RadixNode *parent = current->parent;
-			char char_to_remove = current->parent_char;
+	if (!current || current->is_end)
+		return;
 
-			// If the current node has no children and is not an end node, it
-			// can be removed
-			if (current->children.empty() && !current->is_end) {
-				auto pit = find_child(parent, char_to_remove);
-				if (pit != parent->children.end() &&
-					pit->first == char_to_remove) {
-					parent->children.erase(pit);
-				}
-				current = parent; // Move up to parent
-			} else {
-				// If this node has children or is an end node, stop cleanup
-				break;
-			}
+	// Walk back up the recorded path, erasing each node that has become
+	// orphaned (no children and not an end-of-word marker).
+	while (!path.empty() && current->children.empty() && !current->is_end) {
+		Frame frame = path.back();
+		path.pop_back();
+
+		auto pit = find_child(frame.parent, frame.edge_char);
+		if (pit != frame.parent->children.end() &&
+			pit->first == frame.edge_char) {
+			frame.parent->children.erase(pit); // frees `current`
 		}
+		current = frame.parent; // Move up to parent
 	}
 }
 
@@ -510,9 +514,6 @@ void RadixTrie::split_node(RadixNode *current, char first_char,
 	// Create intermediate node with common prefix
 	auto intermediate =
 		std::make_unique<RadixNode>(std::string(child_key.data(), common_len));
-	// Set parent linkage for the intermediate node
-	intermediate->parent = current;
-	intermediate->parent_char = first_char;
 
 	// Get the old child before moving it
 	auto it = find_child(current, first_char);
@@ -524,13 +525,9 @@ void RadixTrie::split_node(RadixNode *current, char first_char,
 
 	// Move the old child under the intermediate node
 	char old_first_char = old_child->key[0];
-	RadixNode *old_child_raw = old_child.get();
 	auto insert_pos = find_child(intermediate.get(), old_first_char);
 	intermediate->children.insert(
 		insert_pos, std::make_pair(old_first_char, std::move(old_child)));
-	// Fix old child's parent linkage
-	old_child_raw->parent = intermediate.get();
-	old_child_raw->parent_char = old_first_char;
 
 	// Replace the old child with the intermediate node
 	it->second = std::move(intermediate);
@@ -592,12 +589,36 @@ RadixTrie::HeightStats RadixTrie::get_height_stats() const {
 	return stats;
 }
 
+// Returns true when a std::string stores its content inline (small-string
+// optimization) rather than on the heap. Detected by checking whether the data
+// pointer points into the string object itself, which works across libstdc++,
+// libc++ and MSVC regardless of their differing inline capacities.
+//
+// CAVEAT: this is technically implementation behavior, not guaranteed by the
+// standard. The standard mandates that SSO content live somewhere, but not that
+// data() point inside the object. Every mainstream implementation lays it out
+// this way, so the check is safe in practice, but a hypothetical conforming
+// library could store the inline buffer elsewhere and defeat it. It is only
+// used for the memory accounting below, so a wrong answer would skew the stats,
+// never corrupt the trie.
+static bool string_is_inlined(const std::string &s) {
+	const char *data = s.data();
+	const char *obj = reinterpret_cast<const char *>(&s);
+	return data >= obj && data < obj + sizeof(std::string);
+}
+
 // Helper method to calculate memory usage recursively
 size_t RadixTrie::calculate_memory_recursive(const RadixNode *node) const {
 	if (!node)
 		return 0;
 
-	size_t memory = sizeof(RadixNode) + node->key.size();
+	size_t memory =
+		sizeof(RadixNode) +
+		node->children.capacity() *
+			sizeof(std::pair<char, std::unique_ptr<RadixNode>>);
+	if (!string_is_inlined(node->key)) {
+		memory += node->key.capacity() + 1;
+	}
 
 	for (const auto &[ch, child] : node->children) {
 		memory += calculate_memory_recursive(child.get());
@@ -608,20 +629,25 @@ size_t RadixTrie::calculate_memory_recursive(const RadixNode *node) const {
 
 // Get memory usage statistics
 RadixTrie::MemoryStats RadixTrie::get_memory_stats() const {
-	MemoryStats stats;
+	MemoryStats stats{};
 
 	if (empty()) {
-		stats.total_bytes = sizeof(*this) + sizeof(RadixNode); // Just the root
 		stats.node_count = 1;
-		stats.string_bytes = 0;
+		stats.struct_bytes = sizeof(RadixNode);
+		stats.total_bytes = sizeof(*this) + sizeof(RadixNode); // Just the root
 		stats.overhead_bytes = stats.total_bytes;
-		stats.bytes_per_word = 0.0;
 		return stats;
 	}
 
-	// Count nodes and calculate memory
+	// Count nodes and the memory each one actually requests from the allocator.
+	// Each node contributes its fixed struct size (which already includes the
+	// inline std::string and std::vector objects) plus any heap buffers those
+	// members allocate: the children vector's backing array and, for long keys,
+	// the string's heap storage.
 	size_t node_count = 0;
-	size_t string_bytes = 0;
+	size_t string_bytes = 0;		// raw character payload
+	size_t child_buffer_bytes = 0;	// heap backing arrays for children vectors
+	size_t string_buffer_bytes = 0; // heap for non-SSO keys
 
 	std::function<void(const RadixNode *)> count_nodes =
 		[&](const RadixNode *node) {
@@ -629,6 +655,15 @@ RadixTrie::MemoryStats RadixTrie::get_memory_stats() const {
 				return;
 			node_count++;
 			string_bytes += node->key.size();
+
+			if (!string_is_inlined(node->key)) {
+				string_buffer_bytes += node->key.capacity() + 1; // +1 for NUL
+			}
+
+			child_buffer_bytes +=
+				node->children.capacity() *
+				sizeof(std::pair<char, std::unique_ptr<RadixNode>>);
+
 			for (const auto &[ch, child] : node->children) {
 				count_nodes(child.get());
 			}
@@ -638,10 +673,23 @@ RadixTrie::MemoryStats RadixTrie::get_memory_stats() const {
 
 	stats.node_count = node_count;
 	stats.string_bytes = string_bytes;
-	stats.total_bytes =
-		sizeof(*this) + node_count * sizeof(RadixNode) + string_bytes;
+	stats.struct_bytes = node_count * sizeof(RadixNode);
+	stats.child_buffer_bytes = child_buffer_bytes;
+	stats.string_buffer_bytes = string_buffer_bytes;
+	// CAVEAT: total_bytes is the number of bytes *requested* from the allocator,
+	// not the process resident set size (RSS). Real RSS is somewhat higher: each
+	// allocation (one per node, plus one per non-empty children buffer and per
+	// non-SSO key) carries an allocator header and is rounded up to an alignment
+	// boundary. That per-allocation surcharge is allocator-specific (glibc,
+	// jemalloc, the macOS and Windows allocators all differ), so we deliberately
+	// do not fold in a guessed constant here rather than report a figure that is
+	// wrong on every platform but one.
+	stats.total_bytes = sizeof(*this) + stats.struct_bytes +
+						child_buffer_bytes + string_buffer_bytes;
 	stats.overhead_bytes = stats.total_bytes - string_bytes;
-	stats.bytes_per_word = static_cast<double>(stats.total_bytes) / word_count_;
+	stats.bytes_per_word =
+		word_count_ ? static_cast<double>(stats.total_bytes) / word_count_
+					: 0.0;
 
 	return stats;
 }

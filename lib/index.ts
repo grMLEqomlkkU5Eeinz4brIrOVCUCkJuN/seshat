@@ -29,6 +29,9 @@ interface NativeSeshat {
 		  totalBytes: number;
 		  nodeCount: number;
 		  stringBytes: number;
+		  structBytes: number;
+		  childBufferBytes: number;
+		  stringBufferBytes: number;
 		  overheadBytes: number;
 		  bytesPerWord: number;
 	  };
@@ -142,12 +145,15 @@ export class Seshat {
 	  /**
 	   * Get memory usage statistics for the trie
 	   * @remarks This performs a full O(n) traversal of the trie. Avoid calling frequently on large tries.
-	   * @returns Object with totalBytes, nodeCount, stringBytes, overheadBytes, bytesPerWord
+	   * @returns Object with totalBytes, nodeCount, stringBytes, structBytes, childBufferBytes, stringBufferBytes, overheadBytes, bytesPerWord
 	   */
 	  getMemoryStats(): {
 		  totalBytes: number;
 		  nodeCount: number;
 		  stringBytes: number;
+		  structBytes: number;
+		  childBufferBytes: number;
+		  stringBufferBytes: number;
 		  overheadBytes: number;
 		  bytesPerWord: number;
 		  } {

@@ -414,6 +414,15 @@ Napi::Value Seshat::GetMemoryStats(const Napi::CallbackInfo &info) {
 			"stringBytes",
 			Napi::Number::New(env, static_cast<double>(stats.string_bytes)));
 		result.Set(
+			"structBytes",
+			Napi::Number::New(env, static_cast<double>(stats.struct_bytes)));
+		result.Set("childBufferBytes",
+				   Napi::Number::New(
+					   env, static_cast<double>(stats.child_buffer_bytes)));
+		result.Set("stringBufferBytes",
+				   Napi::Number::New(
+					   env, static_cast<double>(stats.string_buffer_bytes)));
+		result.Set(
 			"overheadBytes",
 			Napi::Number::New(env, static_cast<double>(stats.overhead_bytes)));
 		result.Set("bytesPerWord",
