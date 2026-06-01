@@ -11,7 +11,7 @@ class RadixTrie {
 	// When i found out about "using", i was like: "don't tell me using uint64 =
 	// long long; is proably a thing" and it is, and that amazes me for some
 	// reason (i came from C)
-	using ChildVec = std::vector<std::pair<char, std::unique_ptr<RadixNode>>>;
+	using ChildVec = std::vector<std::unique_ptr<RadixNode>>;
 	static ChildVec::iterator find_child(RadixNode *node, char c);
 	static ChildVec::const_iterator find_child(const RadixNode *node, char c);
 
@@ -31,7 +31,6 @@ class RadixTrie {
 										int current_length,
 										std::vector<int> &lengths) const;
 
-	size_t calculate_memory_recursive(const RadixNode *node) const;
 	void pattern_match_recursive(const RadixNode *node,
 								 const std::string &current_word,
 								 const std::string &pattern,
