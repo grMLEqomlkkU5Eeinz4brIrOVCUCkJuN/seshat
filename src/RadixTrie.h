@@ -24,7 +24,7 @@ class RadixTrie {
 								 std::vector<std::string> &result) const;
 	void cleanup_orphaned_nodes(std::string_view word);
 	void split_node(RadixNode *current, char first_char, size_t common_len,
-					const std::string &child_key, std::string_view remaining);
+					std::string_view child_key, std::string_view remaining);
 	void calculate_heights_recursive(const RadixNode *node, int current_depth,
 									 std::vector<int> &heights) const;
 	void collect_word_lengths_recursive(const RadixNode *node,

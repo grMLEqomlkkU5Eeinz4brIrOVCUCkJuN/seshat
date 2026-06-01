@@ -55,7 +55,7 @@ RadixNode *RadixTrie::find_node(std::string_view word) const {
 		}
 
 		RadixNode *child = it->get();
-		const std::string &child_key = child->key;
+		std::string_view child_key = child->key;
 
 		if (pos + child_key.length() > word.length()) {
 			return nullptr; // Child key is longer than remaining word
@@ -301,7 +301,8 @@ void RadixTrie::collect_words_from_node(
 	if (!node)
 		return;
 
-	std::string full_word = prefix + node->key;
+	std::string full_word = prefix;
+	full_word.append(node->key.data(), node->key.size());
 
 	if (node->is_end) {
 		result.push_back(full_word);
@@ -325,8 +326,7 @@ void RadixTrie::insert(std::string_view word) {
 
 		if (it == current->children.end() || (*it)->key.front() != first_char) {
 			// No child with this first character, create new node
-			auto new_node = std::make_unique<RadixNode>(
-				std::string(word.data() + pos, word.length() - pos));
+			auto new_node = std::make_unique<RadixNode>(word.substr(pos));
 			new_node->is_end = true;
 			current->children.insert(it, std::move(new_node));
 			++word_count_;
@@ -334,7 +334,7 @@ void RadixTrie::insert(std::string_view word) {
 		}
 
 		RadixNode *child = it->get();
-		const std::string &child_key = child->key;
+		std::string_view child_key = child->key;
 		std::string_view remaining(word.data() + pos, word.length() - pos);
 
 		size_t common_len = common_prefix_length(child_key, remaining);
@@ -392,7 +392,7 @@ bool RadixTrie::starts_with(std::string_view prefix) const {
 		}
 
 		RadixNode *child = it->get();
-		const std::string &child_key = child->key;
+		std::string_view child_key = child->key;
 
 		if (pos + child_key.length() > prefix.length()) {
 			// Child key is longer than remaining prefix
@@ -437,7 +437,7 @@ RadixTrie::words_with_prefix(std::string_view prefix) const {
 		}
 
 		RadixNode *child = it->get();
-		const std::string &child_key = child->key;
+		std::string_view child_key = child->key;
 
 		if (pos + child_key.length() > prefix.length()) {
 			// Child key is longer than remaining prefix
@@ -500,7 +500,7 @@ void RadixTrie::cleanup_orphaned_nodes(std::string_view word) {
 		}
 
 		RadixNode *child = it->get();
-		const std::string &child_key = child->key;
+		std::string_view child_key = child->key;
 
 		if (pos + child_key.length() > word.length()) {
 			return; // Child key is longer than remaining word
@@ -561,11 +561,11 @@ void RadixTrie::clear() {
 }
 
 void RadixTrie::split_node(RadixNode *current, char first_char,
-						   size_t common_len, const std::string &child_key,
+						   size_t common_len, std::string_view child_key,
 						   std::string_view /* remaining */) {
 	// Create intermediate node with common prefix
 	auto intermediate =
-		std::make_unique<RadixNode>(std::string(child_key.data(), common_len));
+		std::make_unique<RadixNode>(child_key.substr(0, common_len));
 
 	// Get the old child before moving it
 	auto it = find_child(current, first_char);
@@ -639,24 +639,6 @@ RadixTrie::HeightStats RadixTrie::get_height_stats() const {
 	return stats;
 }
 
-// Returns true when a std::string stores its content inline (small-string
-// optimization) rather than on the heap. Detected by checking whether the data
-// pointer points into the string object itself, which works across libstdc++,
-// libc++ and MSVC regardless of their differing inline capacities.
-//
-// CAVEAT: this is technically implementation behavior, not guaranteed by the
-// standard. The standard mandates that SSO content live somewhere, but not that
-// data() point inside the object. Every mainstream implementation lays it out
-// this way, so the check is safe in practice, but a hypothetical conforming
-// library could store the inline buffer elsewhere and defeat it. It is only
-// used for the memory accounting below, so a wrong answer would skew the stats,
-// never corrupt the trie.
-static bool string_is_inlined(const std::string &s) {
-	const char *data = s.data();
-	const char *obj = reinterpret_cast<const char *>(&s);
-	return data >= obj && data < obj + sizeof(std::string);
-}
-
 // Get memory usage statistics
 RadixTrie::MemoryStats RadixTrie::get_memory_stats() const {
 	MemoryStats stats{};
@@ -671,9 +653,9 @@ RadixTrie::MemoryStats RadixTrie::get_memory_stats() const {
 
 	// Count nodes and the memory each one actually requests from the allocator.
 	// Each node contributes its fixed struct size (which already includes the
-	// inline std::string and std::vector objects) plus any heap buffers those
-	// members allocate: the children vector's backing array and, for long keys,
-	// the string's heap storage.
+	// inline CompactKey buffer and the std::vector object) plus any heap buffers
+	// those members allocate: the children vector's backing array and, for keys
+	// longer than CompactKey's inline capacity, the key's heap storage.
 	size_t node_count = 0;
 	size_t string_bytes = 0;		// raw character payload
 	size_t child_buffer_bytes = 0;	// heap backing arrays for children vectors
@@ -694,8 +676,8 @@ RadixTrie::MemoryStats RadixTrie::get_memory_stats() const {
 		node_count++;
 		string_bytes += node->key.size();
 
-		if (!string_is_inlined(node->key)) {
-			string_buffer_bytes += node->key.capacity() + 1; // +1 for NUL
+		if (!node->key.is_inlined()) {
+			string_buffer_bytes += node->key.heap_bytes();
 		}
 
 		child_buffer_bytes +=
@@ -844,7 +826,8 @@ void RadixTrie::pattern_match_recursive(
 	if (!node)
 		return;
 
-	std::string full_word = current_word + node->key;
+	std::string full_word = current_word;
+	full_word.append(node->key.data(), node->key.size());
 
 	if (node->is_end && matches_pattern(full_word, pattern)) {
 		results.push_back(full_word);
