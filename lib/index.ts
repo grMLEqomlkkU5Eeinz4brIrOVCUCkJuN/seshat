@@ -45,6 +45,7 @@ interface NativeSeshat {
 	  };
 	  patternSearch(pattern: string): string[];
 	  insertFromBuffer(buffer: Buffer): number;
+	  removeFromBuffer(buffer: Buffer): number;
 	  toBuffer(): Buffer;
 }
 
@@ -384,6 +385,38 @@ export class Seshat {
 			  throw new TypeError("Argument must be a Buffer");
 		  }
 		  return this.nativeTrie.insertFromBuffer(buffer);
+	  }
+
+	  /**
+	   * Remove words from a Buffer containing newline-delimited text (mass removal).
+	   * This bypasses per-word N-API marshaling overhead, making it the fastest way
+	   * to delete a large set of words in one call. It is the removal counterpart
+	   * to {@link insertFromBuffer}.
+	   *
+	   * Note: like insertFromBuffer, this operates on the raw buffer bytes and does
+	   * NOT apply case-normalization. In an `ignoreCase` trie, pass words in their
+	   * normalized (lower-case) form to match what is stored.
+	   *
+	   * @param buffer - Buffer containing newline-delimited words to remove
+	   * @returns Number of words actually removed (words not present are skipped)
+	   * @throws {TypeError} If buffer is not a Buffer
+	   *
+	   * @example
+	   * ```typescript
+	   * const buf = Buffer.from('hello\nworld\ntest\n');
+	   * const count = trie.removeFromBuffer(buf);
+	   * console.log(`Removed ${count} words`);
+	   * ```
+	   */
+	  removeFromBuffer(buffer: Buffer): number {
+		  if (!Buffer.isBuffer(buffer)) {
+			  throw new TypeError("Argument must be a Buffer");
+		  }
+		  const removed = this.nativeTrie.removeFromBuffer(buffer);
+		  // In ignoreCase mode the originalCasing map is keyed by normalized words;
+		  // we cannot know which keys were removed without re-parsing, so callers
+		  // using ignoreCase should prefer removeBatch for casing-aware cleanup.
+		  return removed;
 	  }
 
 	  /**

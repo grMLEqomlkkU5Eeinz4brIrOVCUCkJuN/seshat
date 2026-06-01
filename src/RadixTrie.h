@@ -83,6 +83,7 @@ class RadixTrie {
 	size_t bulk_insert_from_file(const std::string &path,
 								 size_t buffer_size = 1024 * 1024);
 	size_t bulk_insert_from_buffer(const char *data, size_t length);
+	size_t bulk_remove_from_buffer(const char *data, size_t length);
 	std::string serialize_to_buffer() const;
 
 	HeightStats get_height_stats() const;

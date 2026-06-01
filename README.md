@@ -19,7 +19,7 @@ npm install seshat-trie
 ```
 
 ## Performance-Notes
-Due to N-API overhead when crossing the JavaScript/C++ boundary, individual operations (especially small batch inserts) may be slower than expected on some systems (higher single-core performance is better for this library). For bulk insertions, use `insertFromFile()`, `insertFromBuffer()`, or `insertFromStream()` which bypass per-word N-API marshalling. For serialization, `toBuffer()`/`fromBuffer()` are significantly faster than `toJSON()`/`fromJSON()` (5.7x export, 3.1x import on 3M words).
+Due to N-API overhead when crossing the JavaScript/C++ boundary, individual operations (especially small batch inserts) may be slower than expected on some systems (higher single-core performance is better for this library). For bulk insertions, use `insertFromFile()`, `insertFromBuffer()`, or `insertFromStream()` which bypass per-word N-API marshalling. For bulk removals, use `removeFromBuffer()`. For serialization, `toBuffer()`/`fromBuffer()` are significantly faster than `toJSON()`/`fromJSON()` (5.7x export, 3.1x import on 3M words).
 
 ## Benchmarks
 
@@ -137,6 +137,7 @@ Methods are synchronous unless noted.
 
 - **remove(word: string): boolean**
 - **removeBatch(words: string[]): boolean[]**
+- **removeFromBuffer(buffer: Buffer): number** mass removal from a newline-delimited Buffer (counterpart to `insertFromBuffer`); returns the number of words actually removed, bypassing per-word N-API overhead
 
 - **isEmpty(): boolean**
 - **size(): number**
@@ -144,7 +145,7 @@ Methods are synchronous unless noted.
 
 - **getStats(): { wordCount: number; isEmpty: boolean; allWords: string[] }**
 - **getHeightStats(): { minHeight: number; maxHeight: number; averageHeight: number; modeHeight: number; allHeights: number[] }**
-- **getMemoryStats(): { totalBytes: number; nodeCount: number; stringBytes: number; overheadBytes: number; bytesPerWord: number }**
+- **getMemoryStats(): { totalBytes: number; nodeCount: number; stringBytes: number; structBytes: number; childBufferBytes: number; stringBufferBytes: number; overheadBytes: number; bytesPerWord: number }** `totalBytes` counts bytes requested from the allocator (node structs + children-vector buffers + non-SSO key heap), not process RSS
 - **getWordMetrics(): { minLength: number; maxLength: number; averageLength: number; modeLength: number; lengthDistribution: number[]; totalCharacters: number }**
 
 - **patternSearch(pattern: string): string[]** supports `*` and `?` wildcards
@@ -161,7 +162,7 @@ Methods are synchronous unless noted.
 - Non-string inputs throw where a string is required.
 - `insertFromFile` throws if `bufferSize` is not a positive number or file read fails.
 - `insertFromFileAsync` reports errors via the callback `err` parameter.
-- `insertFromBuffer` and `fromBuffer` throw if the argument is not a `Buffer`.
+- `insertFromBuffer`, `removeFromBuffer`, and `fromBuffer` throw if the argument is not a `Buffer`.
 - `insertFromStream` rejects the returned promise if the stream emits an error.
 
 ### Case handling
@@ -170,8 +171,9 @@ When `ignoreCase` is `true`, inputs are lowercased internally for matching, but 
 
 ## File / Buffer / Stream input format
 
-- `insertFromFile`, `insertFromBuffer`, and `insertFromStream` all expect UTF-8 newline-delimited text (one word per line).
+- `insertFromFile`, `insertFromBuffer`, `removeFromBuffer`, and `insertFromStream` all expect UTF-8 newline-delimited text (one word per line).
 - Line endings: LF, CRLF, and CR are all supported. Leading/trailing whitespace per line is trimmed.
+- `removeFromBuffer` operates on the raw buffer bytes and does not apply case-normalization; in an `ignoreCase` trie, pass words in their normalized (lower-case) form. Returns the count of words actually removed (words not present are skipped).
 - `insertFromFile` default buffer size is 1MB; pass `bufferSize` in bytes to override.
 - `insertFromStream` handles words split across chunk boundaries automatically.
 

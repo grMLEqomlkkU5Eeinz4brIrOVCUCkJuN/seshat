@@ -149,6 +149,20 @@ function runStableBenchmarks(): void {
 		setupTrie.search("missing");
 	}, 50, 15, 1000);
 
+	// Single remove (miss) - non-destructive, parallels Search (miss)
+	coreBench.timeStable("Remove (miss)", () => {
+		setupTrie.remove("missing");
+	}, 50, 15, 1000);
+
+	// Single remove (hit) - re-insert each iteration to keep state repeatable,
+	// so this measures one leaf removal plus one re-insertion of that leaf
+	const removeTrie = new Seshat();
+	removeTrie.insert("testword");
+	coreBench.timeStable("Remove+reinsert (hit)", () => {
+		removeTrie.remove("testword");
+		removeTrie.insert("testword");
+	}, 50, 15, 1000);
+
 	coreBench.printResults();
 
 	// Batch operations benchmark
@@ -189,7 +203,39 @@ function runStableBenchmarks(): void {
 		searchTrie.searchBatch(testWords);
 	}, 20, 10, 10);
 
+	// Individual removals - build then remove all (hit path with pruning).
+	// Compare against "Individual Insert 100" to isolate the remove cost.
+	batchBench.timeStable("Individual Remove 100", () => {
+		const trie = new Seshat();
+		trie.insertBatch(testWords);
+		testWords.forEach(word => trie.remove(word));
+	}, 20, 10, 10);
+
+	// Batch removals via removeBatch (single N-API call)
+	batchBench.timeStable("Batch Remove 100", () => {
+		const trie = new Seshat();
+		trie.insertBatch(testWords);
+		trie.removeBatch(testWords);
+	}, 20, 10, 10);
+
+	// Buffer removals - mass removal via removeFromBuffer (parses in C++)
+	batchBench.timeStable("Buffer Remove 100", () => {
+		const trie = new Seshat();
+		trie.insertFromBuffer(bufferPayload);
+		trie.removeFromBuffer(bufferPayload);
+	}, 20, 10, 10);
+
 	batchBench.printResults();
+
+	// Prefix operations benchmark (read-only traversal paths)
+	const prefixBench = new StableBenchmark("Prefix Operations");
+
+	// Reuse the prefix-sharing word set from the analytics trie
+	// ("hello", "helmet", "helpful" all share the "hel" prefix)
+	prefixBench.timeStable("startsWith (hit)", () => trie.startsWith("hel"), 10, 10, 100);
+	prefixBench.timeStable("startsWith (miss)", () => trie.startsWith("xyz"), 10, 10, 100);
+	prefixBench.timeStable("wordsWithPrefix('hel')", () => trie.getWordsWithPrefix("hel"), 10, 10, 100);
+	prefixBench.printResults();
 
 	// System load test - detect if system is under stress
 	const systemBench = new StableBenchmark("System Stability Check");
@@ -215,6 +261,7 @@ function runStableBenchmarks(): void {
 	const allResults = [
 		...coreBench.getDetailedResults(),
 		...batchBench.getDetailedResults(),
+		...prefixBench.getDetailedResults(),
 		...systemBench.getDetailedResults()
 	];
 
