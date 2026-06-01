@@ -146,6 +146,7 @@ Methods are synchronous unless noted.
 - **getStats(): { wordCount: number; isEmpty: boolean; allWords: string[] }**
 - **getHeightStats(): { minHeight: number; maxHeight: number; averageHeight: number; modeHeight: number; allHeights: number[] }**
 - **getMemoryStats(): { totalBytes: number; nodeCount: number; stringBytes: number; structBytes: number; childBufferBytes: number; stringBufferBytes: number; overheadBytes: number; bytesPerWord: number }** `totalBytes` counts bytes requested from the allocator (node structs + children-vector buffers + non-SSO key heap), not process RSS
+> Slight performance regression of about -23% due to adding finer grain detailing about how memory is spent
 - **getWordMetrics(): { minLength: number; maxLength: number; averageLength: number; modeLength: number; lengthDistribution: number[]; totalCharacters: number }**
 
 - **patternSearch(pattern: string): string[]** supports `*` and `?` wildcards
