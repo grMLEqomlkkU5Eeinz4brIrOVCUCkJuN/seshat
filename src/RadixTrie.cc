@@ -1,20 +1,21 @@
 #include "RadixTrie.h"
 #include <algorithm>
 #include <cctype>
-#include <cmath>
 #include <fstream>
-#include <functional>
 #include <numeric>
 #include <unordered_map>
 
 RadixTrie::RadixTrie() : root(std::make_unique<RadixNode>()), word_count_(0) {}
 
+// Children are kept sorted by the first character of their key. Every child's
+// key is non-empty (only the root has an empty key, and the root is never a
+// child), so key.front() is always valid here.
 RadixTrie::ChildVec::iterator RadixTrie::find_child(RadixNode *node, char c) {
 	auto &v = node->children;
 	return std::lower_bound(
 		v.begin(), v.end(), c,
-		[](const std::pair<char, std::unique_ptr<RadixNode>> &p, char key) {
-			return p.first < key;
+		[](const std::unique_ptr<RadixNode> &child, char key) {
+			return child->key.front() < key;
 		});
 }
 
@@ -23,8 +24,8 @@ RadixTrie::ChildVec::const_iterator RadixTrie::find_child(const RadixNode *node,
 	const auto &v = node->children;
 	return std::lower_bound(
 		v.begin(), v.end(), c,
-		[](const std::pair<char, std::unique_ptr<RadixNode>> &p, char key) {
-			return p.first < key;
+		[](const std::unique_ptr<RadixNode> &child, char key) {
+			return child->key.front() < key;
 		});
 }
 
@@ -49,12 +50,12 @@ RadixNode *RadixTrie::find_node(std::string_view word) const {
 		char first_char = word[pos];
 		auto it = find_child(current, first_char);
 
-		if (it == current->children.end() || it->first != first_char) {
+		if (it == current->children.end() || (*it)->key.front() != first_char) {
 			return nullptr; // Path doesn't exist
 		}
 
-		RadixNode *child = it->second.get();
-		const std::string &child_key = child->key;
+		RadixNode *child = it->get();
+		std::string_view child_key = child->key;
 
 		if (pos + child_key.length() > word.length()) {
 			return nullptr; // Child key is longer than remaining word
@@ -224,6 +225,58 @@ size_t RadixTrie::bulk_insert_from_buffer(const char *data, size_t length) {
 	return words_inserted;
 }
 
+// Mass removal counterpart to bulk_insert_from_buffer. Parses newline-delimited,
+// whitespace-trimmed words from the buffer and removes each one, returning the
+// number of words actually removed (words that were not present are skipped).
+size_t RadixTrie::bulk_remove_from_buffer(const char *data, size_t length) {
+	size_t words_removed = 0;
+	size_t line_start = 0;
+
+	for (size_t i = 0; i < length; ++i) {
+		char c = data[i];
+		if (c == '\n' || c == '\r') {
+			size_t seg_len = i - line_start;
+			if (seg_len > 0) {
+				const char *seg_ptr = data + line_start;
+				size_t b = 0, e = seg_len;
+				while (e > b &&
+					   std::isspace(static_cast<unsigned char>(seg_ptr[e - 1])))
+					--e;
+				while (b < e &&
+					   std::isspace(static_cast<unsigned char>(seg_ptr[b])))
+					++b;
+				if (e > b) {
+					std::string_view word_view(seg_ptr + b, e - b);
+					if (remove(word_view))
+						++words_removed;
+				}
+			}
+			while (i + 1 < length &&
+				   (data[i + 1] == '\n' || data[i + 1] == '\r'))
+				++i;
+			line_start = i + 1;
+		}
+	}
+
+	if (line_start < length) {
+		const char *seg_ptr = data + line_start;
+		size_t seg_len = length - line_start;
+		size_t b = 0, e = seg_len;
+		while (e > b &&
+			   std::isspace(static_cast<unsigned char>(seg_ptr[e - 1])))
+			--e;
+		while (b < e && std::isspace(static_cast<unsigned char>(seg_ptr[b])))
+			++b;
+		if (e > b) {
+			std::string_view word_view(seg_ptr + b, e - b);
+			if (remove(word_view))
+				++words_removed;
+		}
+	}
+
+	return words_removed;
+}
+
 std::string RadixTrie::serialize_to_buffer() const {
 	std::string output;
 	if (empty())
@@ -248,13 +301,14 @@ void RadixTrie::collect_words_from_node(
 	if (!node)
 		return;
 
-	std::string full_word = prefix + node->key;
+	std::string full_word = prefix;
+	full_word.append(node->key.data(), node->key.size());
 
 	if (node->is_end) {
 		result.push_back(full_word);
 	}
 
-	for (const auto &[ch, child] : node->children) {
+	for (const auto &child : node->children) {
 		collect_words_from_node(child.get(), full_word, result);
 	}
 }
@@ -270,20 +324,17 @@ void RadixTrie::insert(std::string_view word) {
 		char first_char = word[pos];
 		auto it = find_child(current, first_char);
 
-		if (it == current->children.end() || it->first != first_char) {
+		if (it == current->children.end() || (*it)->key.front() != first_char) {
 			// No child with this first character, create new node
-			auto new_node = std::make_unique<RadixNode>(
-				std::string(word.data() + pos, word.length() - pos), current,
-				first_char);
+			auto new_node = std::make_unique<RadixNode>(word.substr(pos));
 			new_node->is_end = true;
-			current->children.insert(
-				it, std::make_pair(first_char, std::move(new_node)));
+			current->children.insert(it, std::move(new_node));
 			++word_count_;
 			return;
 		}
 
-		RadixNode *child = it->second.get();
-		const std::string &child_key = child->key;
+		RadixNode *child = it->get();
+		std::string_view child_key = child->key;
 		std::string_view remaining(word.data() + pos, word.length() - pos);
 
 		size_t common_len = common_prefix_length(child_key, remaining);
@@ -305,7 +356,7 @@ void RadixTrie::insert(std::string_view word) {
 			// Need to split the child node - use helper method
 			split_node(current, first_char, common_len, child_key, remaining);
 			pos += common_len;
-			current = find_child(current, first_char)->second.get();
+			current = find_child(current, first_char)->get();
 
 			if (pos == word.length()) {
 				// Word ends at the intermediate node
@@ -336,12 +387,12 @@ bool RadixTrie::starts_with(std::string_view prefix) const {
 		char first_char = prefix[pos];
 		auto it = find_child(current, first_char);
 
-		if (it == current->children.end() || it->first != first_char) {
+		if (it == current->children.end() || (*it)->key.front() != first_char) {
 			return false; // Path doesn't exist
 		}
 
-		RadixNode *child = it->second.get();
-		const std::string &child_key = child->key;
+		RadixNode *child = it->get();
+		std::string_view child_key = child->key;
 
 		if (pos + child_key.length() > prefix.length()) {
 			// Child key is longer than remaining prefix
@@ -381,12 +432,12 @@ RadixTrie::words_with_prefix(std::string_view prefix) const {
 		char first_char = prefix[pos];
 		auto it = find_child(current, first_char);
 
-		if (it == current->children.end() || it->first != first_char) {
+		if (it == current->children.end() || (*it)->key.front() != first_char) {
 			return result; // Prefix not found
 		}
 
-		RadixNode *child = it->second.get();
-		const std::string &child_key = child->key;
+		RadixNode *child = it->get();
+		std::string_view child_key = child->key;
 
 		if (pos + child_key.length() > prefix.length()) {
 			// Child key is longer than remaining prefix
@@ -427,20 +478,29 @@ void RadixTrie::cleanup_orphaned_nodes(std::string_view word) {
 	if (word.empty() || !root)
 		return;
 
+	// Record the descent path so we can walk back up without storing a parent
+	// pointer on every node. Each frame is an ancestor and the first character
+	// of the edge taken from it toward the target.
+	struct Frame {
+		RadixNode *parent;
+		char edge_char;
+	};
+	std::vector<Frame> path;
+
 	RadixNode *current = root.get();
 	size_t pos = 0;
 
-	// Find the node to delete
+	// Find the node to delete, recording the path as we descend
 	while (pos < word.length() && current) {
 		char first_char = word[pos];
 		auto it = find_child(current, first_char);
 
-		if (it == current->children.end() || it->first != first_char) {
+		if (it == current->children.end() || (*it)->key.front() != first_char) {
 			return; // Path doesn't exist
 		}
 
-		RadixNode *child = it->second.get();
-		const std::string &child_key = child->key;
+		RadixNode *child = it->get();
+		std::string_view child_key = child->key;
 
 		if (pos + child_key.length() > word.length()) {
 			return; // Child key is longer than remaining word
@@ -451,31 +511,27 @@ void RadixTrie::cleanup_orphaned_nodes(std::string_view word) {
 			return; // Keys don't match
 		}
 
+		path.push_back({current, first_char});
 		pos += child_key.length();
 		current = child;
 	}
 
 	// Only clean up if we found the exact node and it's marked as end
-	if (current && current->is_end) {
-		// Clean up from the current node back to the root using parent pointers
-		while (current && current->parent) {
-			RadixNode *parent = current->parent;
-			char char_to_remove = current->parent_char;
+	if (!current || current->is_end)
+		return;
 
-			// If the current node has no children and is not an end node, it
-			// can be removed
-			if (current->children.empty() && !current->is_end) {
-				auto pit = find_child(parent, char_to_remove);
-				if (pit != parent->children.end() &&
-					pit->first == char_to_remove) {
-					parent->children.erase(pit);
-				}
-				current = parent; // Move up to parent
-			} else {
-				// If this node has children or is an end node, stop cleanup
-				break;
-			}
+	// Walk back up the recorded path, erasing each node that has become
+	// orphaned (no children and not an end-of-word marker).
+	while (!path.empty() && current->children.empty() && !current->is_end) {
+		Frame frame = path.back();
+		path.pop_back();
+
+		auto pit = find_child(frame.parent, frame.edge_char);
+		if (pit != frame.parent->children.end() &&
+			(*pit)->key.front() == frame.edge_char) {
+			frame.parent->children.erase(pit); // frees `current`
 		}
+		current = frame.parent; // Move up to parent
 	}
 }
 
@@ -505,35 +561,26 @@ void RadixTrie::clear() {
 }
 
 void RadixTrie::split_node(RadixNode *current, char first_char,
-						   size_t common_len, const std::string &child_key,
+						   size_t common_len, std::string_view child_key,
 						   std::string_view /* remaining */) {
 	// Create intermediate node with common prefix
 	auto intermediate =
-		std::make_unique<RadixNode>(std::string(child_key.data(), common_len));
-	// Set parent linkage for the intermediate node
-	intermediate->parent = current;
-	intermediate->parent_char = first_char;
+		std::make_unique<RadixNode>(child_key.substr(0, common_len));
 
 	// Get the old child before moving it
 	auto it = find_child(current, first_char);
-	auto old_child = std::move(it->second);
+	auto old_child = std::move(*it);
 
 	// Update child's key to remaining part
 	old_child->key.assign(child_key.data() + common_len,
 						  child_key.length() - common_len);
 
-	// Move the old child under the intermediate node
-	char old_first_char = old_child->key[0];
-	RadixNode *old_child_raw = old_child.get();
-	auto insert_pos = find_child(intermediate.get(), old_first_char);
-	intermediate->children.insert(
-		insert_pos, std::make_pair(old_first_char, std::move(old_child)));
-	// Fix old child's parent linkage
-	old_child_raw->parent = intermediate.get();
-	old_child_raw->parent_char = old_first_char;
+	// Move the old child under the intermediate node. The intermediate has no
+	// other children yet, so it becomes the sole (and trivially sorted) child.
+	intermediate->children.push_back(std::move(old_child));
 
 	// Replace the old child with the intermediate node
-	it->second = std::move(intermediate);
+	*it = std::move(intermediate);
 }
 
 // Helper method to calculate heights recursively
@@ -547,7 +594,7 @@ void RadixTrie::calculate_heights_recursive(const RadixNode *node,
 		heights.push_back(current_depth);
 	}
 
-	for (const auto &[ch, child] : node->children) {
+	for (const auto &child : node->children) {
 		calculate_heights_recursive(child.get(), current_depth + 1, heights);
 	}
 }
@@ -592,56 +639,74 @@ RadixTrie::HeightStats RadixTrie::get_height_stats() const {
 	return stats;
 }
 
-// Helper method to calculate memory usage recursively
-size_t RadixTrie::calculate_memory_recursive(const RadixNode *node) const {
-	if (!node)
-		return 0;
-
-	size_t memory = sizeof(RadixNode) + node->key.size();
-
-	for (const auto &[ch, child] : node->children) {
-		memory += calculate_memory_recursive(child.get());
-	}
-
-	return memory;
-}
-
 // Get memory usage statistics
 RadixTrie::MemoryStats RadixTrie::get_memory_stats() const {
-	MemoryStats stats;
+	MemoryStats stats{};
 
 	if (empty()) {
-		stats.total_bytes = sizeof(*this) + sizeof(RadixNode); // Just the root
 		stats.node_count = 1;
-		stats.string_bytes = 0;
+		stats.struct_bytes = sizeof(RadixNode);
+		stats.total_bytes = sizeof(*this) + sizeof(RadixNode); // Just the root
 		stats.overhead_bytes = stats.total_bytes;
-		stats.bytes_per_word = 0.0;
 		return stats;
 	}
 
-	// Count nodes and calculate memory
+	// Count nodes and the memory each one actually requests from the allocator.
+	// Each node contributes its fixed struct size (which already includes the
+	// inline CompactKey buffer and the std::vector object) plus any heap buffers
+	// those members allocate: the children vector's backing array and, for keys
+	// longer than CompactKey's inline capacity, the key's heap storage.
 	size_t node_count = 0;
-	size_t string_bytes = 0;
+	size_t string_bytes = 0;		// raw character payload
+	size_t child_buffer_bytes = 0;	// heap backing arrays for children vectors
+	size_t string_buffer_bytes = 0; // heap for non-SSO keys
 
-	std::function<void(const RadixNode *)> count_nodes =
-		[&](const RadixNode *node) {
-			if (!node)
-				return;
-			node_count++;
-			string_bytes += node->key.size();
-			for (const auto &[ch, child] : node->children) {
-				count_nodes(child.get());
-			}
-		};
+	// Iterative depth-first walk. This used to be a std::function recursion,
+	// which allocated the closure on the heap and called through a type-erased
+	// indirection on every node, making get_memory_stats noticeably slower than
+	// the rest of the analytics. An explicit stack keeps it flat and fast.
+	std::vector<const RadixNode *> stack;
+	stack.push_back(root.get());
+	while (!stack.empty()) {
+		const RadixNode *node = stack.back();
+		stack.pop_back();
+		if (!node)
+			continue;
 
-	count_nodes(root.get());
+		node_count++;
+		string_bytes += node->key.size();
+
+		if (!node->key.is_inlined()) {
+			string_buffer_bytes += node->key.heap_bytes();
+		}
+
+		child_buffer_bytes +=
+			node->children.capacity() * sizeof(std::unique_ptr<RadixNode>);
+
+		for (const auto &child : node->children) {
+			stack.push_back(child.get());
+		}
+	}
 
 	stats.node_count = node_count;
 	stats.string_bytes = string_bytes;
-	stats.total_bytes =
-		sizeof(*this) + node_count * sizeof(RadixNode) + string_bytes;
+	stats.struct_bytes = node_count * sizeof(RadixNode);
+	stats.child_buffer_bytes = child_buffer_bytes;
+	stats.string_buffer_bytes = string_buffer_bytes;
+	// CAVEAT: total_bytes is the number of bytes *requested* from the allocator,
+	// not the process resident set size (RSS). Real RSS is somewhat higher: each
+	// allocation (one per node, plus one per non-empty children buffer and per
+	// non-SSO key) carries an allocator header and is rounded up to an alignment
+	// boundary. That per-allocation surcharge is allocator-specific (glibc,
+	// jemalloc, the macOS and Windows allocators all differ), so we deliberately
+	// do not fold in a guessed constant here rather than report a figure that is
+	// wrong on every platform but one.
+	stats.total_bytes = sizeof(*this) + stats.struct_bytes +
+						child_buffer_bytes + string_buffer_bytes;
 	stats.overhead_bytes = stats.total_bytes - string_bytes;
-	stats.bytes_per_word = static_cast<double>(stats.total_bytes) / word_count_;
+	stats.bytes_per_word =
+		word_count_ ? static_cast<double>(stats.total_bytes) / word_count_
+					: 0.0;
 
 	return stats;
 }
@@ -659,7 +724,7 @@ void RadixTrie::collect_word_lengths_recursive(
 		lengths.push_back(new_length);
 	}
 
-	for (const auto &[ch, child] : node->children) {
+	for (const auto &child : node->children) {
 		collect_word_lengths_recursive(child.get(), new_length, lengths);
 	}
 }
@@ -761,13 +826,14 @@ void RadixTrie::pattern_match_recursive(
 	if (!node)
 		return;
 
-	std::string full_word = current_word + node->key;
+	std::string full_word = current_word;
+	full_word.append(node->key.data(), node->key.size());
 
 	if (node->is_end && matches_pattern(full_word, pattern)) {
 		results.push_back(full_word);
 	}
 
-	for (const auto &[ch, child] : node->children) {
+	for (const auto &child : node->children) {
 		pattern_match_recursive(child.get(), full_word, pattern, results);
 	}
 }

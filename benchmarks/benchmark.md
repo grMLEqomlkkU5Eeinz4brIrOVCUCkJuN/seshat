@@ -405,3 +405,126 @@ Buffer import (fromBuffer)        1155.77    6273234
 | insertFromBuffer | 1258 ms | Fastest, data already in memory          |
 | insertFromFile   | 1334 ms | C++ file I/O with configurable buffer    |
 | insertFromStream | 2924 ms | Streams from disk, chunk-by-chunk        |
+
+## Memory-Optimized Benchmarks
+
+Linux 7.0.10-arch1-1, Node v24.15.0, i7-1255U (turbo boost enabled)
+
+Three memory passes layered on top of each other:
+
+1. Dropped the redundant first-character cached next to every child pointer
+   (it always equals `child->key.front()`), halving the children buffer.
+2. Pool-allocated `RadixNode` to strip the per-node allocator header from RSS.
+3. Replaced the 32-byte `std::string` key with a 16-byte `CompactKey`
+   (15 bytes inline, heap spill beyond), taking the node from 64 to 48 bytes.
+
+### Memory footprint (terms.txt - 6.3M words, 9,117,043 nodes)
+
+| Stage                         | bytes/word | totalBytes | structBytes | childBufferBytes |
+|-------------------------------|-----------:|-----------:|------------:|-----------------:|
+| Baseline                      |     120.95 |  723.57 MB |   556.46 MB |        166.33 MB |
+| + edge-char drop + node pool  |     107.04 |  640.40 MB |   556.46 MB |         83.17 MB |
+| + CompactKey (32 to 16 B key) |  **83.75** | **501.06 MB** | **417.35 MB** |     83.17 MB |
+
+Net: **-30.8% bytes/word, -222 MB** versus baseline, with the children buffer
+halved by the edge-char drop and `structBytes` cut by the smaller key.
+
+### Main Benchmarks
+
+```text
+=== Analytics Methods ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+getHeightStats           613,766        656,254     9.5     531994-680953
+getMemoryStats           862,173        928,445     20.2    374047-988953
+getWordMetrics           557,495        590,929     12.9    351108-601583
+patternSearch('*a*')     833,105        920,217     14.5    639627-982646
+
+=== Core Operations ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+Insert                   1,300,772      1,443,747   25.7    723118-1600725
+Search (hit)             8,996,523      9,537,253   19.7    3436958-10329085
+Search (miss)            9,800,905      10,368,604  17.9    5028107-11298924
+Remove (miss)            9,397,576      9,840,873   19.8    3769701-10931351
+Remove+reinsert (hit)    4,061,103      4,342,709   14.7    2408344-4591832
+
+=== Batch vs Individual ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+Individual Insert 100    61,006         62,930      14.3    45104-71058
+Batch Insert 100         53,679         57,796      13.4    37205-61053
+Buffer Insert 100        172,855        182,289     15.7    92005-186425
+Individual Search 100    73,000         74,453      6.3     59245-75305
+Batch Search 100         45,317         46,762      8.5     37269-49383
+Individual Remove 100    26,778         27,667      4.6     24600-27953
+Batch Remove 100         24,190         24,496      3.3     22320-24886
+Buffer Remove 100        75,960         77,760      4.7     65629-77982
+
+=== Prefix Operations ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+startsWith (hit)         5,350,906      6,097,561   28.4    1371084-6335128
+startsWith (miss)        7,926,583      8,752,735   25.6    3840098-9634840
+wordsWithPrefix('hel')   1,368,332      1,473,514   11.9    1136945-1545738
+
+=== System Stability Check ===
+Test Name                Mean Ops/sec   Median      CV%     Range
+--------------------------------------------------------------------------------
+CPU Stability            741,213        749,260     2.4     681779-749395
+```
+
+### File Streaming & Serialization (terms.txt - 6.3M words)
+
+```text
+--- insertFromFile ---
+Words inserted: 6273234
+Time taken: 971.59 ms
+bufferSize: 16777216 bytes
+Memory Stats: {
+  "totalBytes": "501.06 MB",
+  "nodeCount": "8.69 MB",
+  "stringBytes": "39.38 MB",
+  "structBytes": "417.35 MB",
+  "childBufferBytes": "83.17 MB",
+  "stringBufferBytes": "557.34 KB",
+  "overheadBytes": "461.67 MB",
+  "bytesPerWord": "83.75200813487908 B"
+}
+Node count: 9117043
+
+--- JSON serialization ---
+Export to JSON time: 2809.77 ms
+Import from JSON time: 2621.05 ms
+Verified word count: 6273234
+
+--- Buffer serialization ---
+Export to Buffer time: 504.04 ms
+Buffer size: 91.14 MB
+Import from Buffer time: 859.97 ms
+Verified word count: 6273234
+
+--- insertFromBuffer ---
+Words inserted: 6273234
+Time taken: 995.72 ms
+
+--- insertFromStream ---
+Words inserted: 6273234
+Time taken: 1616.82 ms
+
+--- Summary ---
+Method                          Time (ms)      Words
+----------------------------------------------------
+insertFromFile                     971.59    6273234
+insertFromBuffer                   995.72    6273234
+insertFromStream                  1616.82    6273234
+JSON export                       2809.77
+JSON import                       2621.05    6273234
+Buffer export (toBuffer)           504.04
+Buffer import (fromBuffer)         859.97    6273234
+```
+
+Insertion also improved alongside the memory cuts: `insertFromFile` 1334 to
+972 ms and `insertFromStream` 2924 to 1617 ms versus the pre-optimization
+buffer-and-stream run above, from the pool allocator and the smaller, more
+cache-friendly node.

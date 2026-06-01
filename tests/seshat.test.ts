@@ -1133,6 +1133,141 @@ describe("Buffer Operations", () => {
 		});
 	});
 
+	describe("removeFromBuffer", () => {
+		test("should remove words from a newline-delimited buffer", () => {
+			const trie = new Seshat();
+			trie.insertFromBuffer(Buffer.from("hello\nworld\ntest\n"));
+
+			const count = trie.removeFromBuffer(Buffer.from("hello\nworld\n"));
+
+			expect(count).toBe(2);
+			expect(trie.size()).toBe(1);
+			expect(trie.search("hello")).toBe(false);
+			expect(trie.search("world")).toBe(false);
+			expect(trie.search("test")).toBe(true);
+		});
+
+		test("should return the number of words actually removed", () => {
+			const trie = new Seshat();
+			trie.insertBatch(["hello", "world"]);
+
+			// Only "hello" and "world" exist; the others are skipped
+			const count = trie.removeFromBuffer(Buffer.from("hello\nmissing\nworld\nalsogone\n"));
+
+			expect(count).toBe(2);
+			expect(trie.size()).toBe(0);
+		});
+
+		test("should handle buffer without trailing newline", () => {
+			const trie = new Seshat();
+			trie.insertBatch(["hello", "world", "test"]);
+
+			const count = trie.removeFromBuffer(Buffer.from("hello\nworld\ntest"));
+
+			expect(count).toBe(3);
+			expect(trie.size()).toBe(0);
+		});
+
+		test("should handle CRLF line endings", () => {
+			const trie = new Seshat();
+			trie.insertBatch(["hello", "world", "test"]);
+
+			const count = trie.removeFromBuffer(Buffer.from("hello\r\nworld\r\n"));
+
+			expect(count).toBe(2);
+			expect(trie.search("hello")).toBe(false);
+			expect(trie.search("test")).toBe(true);
+		});
+
+		test("should skip empty lines", () => {
+			const trie = new Seshat();
+			trie.insertBatch(["hello", "world"]);
+
+			const count = trie.removeFromBuffer(Buffer.from("hello\n\n\nworld\n\n"));
+
+			expect(count).toBe(2);
+			expect(trie.size()).toBe(0);
+		});
+
+		test("should trim whitespace from words", () => {
+			const trie = new Seshat();
+			trie.insertBatch(["hello", "world"]);
+
+			const count = trie.removeFromBuffer(Buffer.from("  hello  \n  world  \n"));
+
+			expect(count).toBe(2);
+			expect(trie.size()).toBe(0);
+		});
+
+		test("should handle empty buffer", () => {
+			const trie = new Seshat();
+			trie.insert("hello");
+
+			const count = trie.removeFromBuffer(Buffer.from(""));
+
+			expect(count).toBe(0);
+			expect(trie.size()).toBe(1);
+		});
+
+		test("should return 0 when removing from an empty trie", () => {
+			const trie = new Seshat();
+			const count = trie.removeFromBuffer(Buffer.from("hello\nworld\n"));
+
+			expect(count).toBe(0);
+			expect(trie.size()).toBe(0);
+		});
+
+		test("should leave unrelated words intact", () => {
+			const trie = new Seshat();
+			trie.insertBatch(["cat", "cats", "car", "card", "dog"]);
+
+			const count = trie.removeFromBuffer(Buffer.from("cats\ncar\n"));
+
+			expect(count).toBe(2);
+			expect(trie.search("cats")).toBe(false);
+			expect(trie.search("car")).toBe(false);
+			expect(trie.search("cat")).toBe(true);
+			expect(trie.search("card")).toBe(true);
+			expect(trie.search("dog")).toBe(true);
+		});
+
+		test("should throw for non-buffer argument", () => {
+			const trie = new Seshat();
+			expect(() => trie.removeFromBuffer("not a buffer" as any)).toThrow("Argument must be a Buffer");
+			expect(() => trie.removeFromBuffer(123 as any)).toThrow("Argument must be a Buffer");
+		});
+
+		test("should handle unicode content", () => {
+			const trie = new Seshat();
+			trie.insertFromBuffer(Buffer.from("café\nnaïve\nrésumé\n", "utf8"));
+
+			const count = trie.removeFromBuffer(Buffer.from("café\nrésumé\n", "utf8"));
+
+			expect(count).toBe(2);
+			expect(trie.search("café")).toBe(false);
+			expect(trie.search("naïve")).toBe(true);
+			expect(trie.search("résumé")).toBe(false);
+		});
+
+		test("should perform mass removal on a large buffer", () => {
+			const words = Array.from({ length: 10000 }, (_, i) => `word${i}`);
+			const buf = Buffer.from(words.join("\n") + "\n");
+			const trie = new Seshat();
+			trie.insertFromBuffer(buf);
+
+			const start = process.hrtime.bigint();
+			const count = trie.removeFromBuffer(buf);
+			const end = process.hrtime.bigint();
+			const duration = Number(end - start) / 1000000;
+
+			expect(count).toBe(10000);
+			expect(trie.size()).toBe(0);
+			expect(trie.search("word0")).toBe(false);
+			expect(trie.search("word9999")).toBe(false);
+			expect(duration).toBeLessThan(500);
+		});
+	});
+
 	describe("toBuffer", () => {
 		test("should serialize empty trie to empty buffer", () => {
 			const trie = new Seshat();

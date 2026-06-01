@@ -28,6 +28,7 @@ Napi::Object Seshat::Init(Napi::Env env, Napi::Object exports) {
 		 InstanceMethod("getWordMetrics", &Seshat::GetWordMetrics),
 		 InstanceMethod("patternSearch", &Seshat::PatternSearch),
 		 InstanceMethod("insertFromBuffer", &Seshat::InsertFromBuffer),
+		 InstanceMethod("removeFromBuffer", &Seshat::RemoveFromBuffer),
 		 InstanceMethod("toBuffer", &Seshat::ToBuffer)});
 
 	constructor = Napi::Persistent(func);
@@ -414,6 +415,15 @@ Napi::Value Seshat::GetMemoryStats(const Napi::CallbackInfo &info) {
 			"stringBytes",
 			Napi::Number::New(env, static_cast<double>(stats.string_bytes)));
 		result.Set(
+			"structBytes",
+			Napi::Number::New(env, static_cast<double>(stats.struct_bytes)));
+		result.Set("childBufferBytes",
+				   Napi::Number::New(
+					   env, static_cast<double>(stats.child_buffer_bytes)));
+		result.Set("stringBufferBytes",
+				   Napi::Number::New(
+					   env, static_cast<double>(stats.string_buffer_bytes)));
+		result.Set(
 			"overheadBytes",
 			Napi::Number::New(env, static_cast<double>(stats.overhead_bytes)));
 		result.Set("bytesPerWord",
@@ -513,6 +523,31 @@ Napi::Value Seshat::InsertFromBuffer(const Napi::CallbackInfo &info) {
 	} catch (const std::exception &e) {
 		Napi::Error::New(
 			env, std::string("Failed to insert from buffer: ") + e.what())
+			.ThrowAsJavaScriptException();
+		return env.Undefined();
+	}
+}
+
+// RemoveFromBuffer method - bulk remove from a Node.js Buffer
+Napi::Value Seshat::RemoveFromBuffer(const Napi::CallbackInfo &info) {
+	Napi::Env env = info.Env();
+
+	if (info.Length() < 1 || !info[0].IsBuffer()) {
+		Napi::TypeError::New(env, "Buffer argument expected")
+			.ThrowAsJavaScriptException();
+		return env.Undefined();
+	}
+
+	Napi::Buffer<char> buf = info[0].As<Napi::Buffer<char>>();
+	const char *data = buf.Data();
+	size_t length = buf.Length();
+
+	try {
+		size_t words_removed = trie_.bulk_remove_from_buffer(data, length);
+		return Napi::Number::New(env, static_cast<double>(words_removed));
+	} catch (const std::exception &e) {
+		Napi::Error::New(
+			env, std::string("Failed to remove from buffer: ") + e.what())
 			.ThrowAsJavaScriptException();
 		return env.Undefined();
 	}

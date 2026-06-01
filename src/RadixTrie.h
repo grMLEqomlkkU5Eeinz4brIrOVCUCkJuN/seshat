@@ -11,7 +11,7 @@ class RadixTrie {
 	// When i found out about "using", i was like: "don't tell me using uint64 =
 	// long long; is proably a thing" and it is, and that amazes me for some
 	// reason (i came from C)
-	using ChildVec = std::vector<std::pair<char, std::unique_ptr<RadixNode>>>;
+	using ChildVec = std::vector<std::unique_ptr<RadixNode>>;
 	static ChildVec::iterator find_child(RadixNode *node, char c);
 	static ChildVec::const_iterator find_child(const RadixNode *node, char c);
 
@@ -24,14 +24,13 @@ class RadixTrie {
 								 std::vector<std::string> &result) const;
 	void cleanup_orphaned_nodes(std::string_view word);
 	void split_node(RadixNode *current, char first_char, size_t common_len,
-					const std::string &child_key, std::string_view remaining);
+					std::string_view child_key, std::string_view remaining);
 	void calculate_heights_recursive(const RadixNode *node, int current_depth,
 									 std::vector<int> &heights) const;
 	void collect_word_lengths_recursive(const RadixNode *node,
 										int current_length,
 										std::vector<int> &lengths) const;
 
-	size_t calculate_memory_recursive(const RadixNode *node) const;
 	void pattern_match_recursive(const RadixNode *node,
 								 const std::string &current_word,
 								 const std::string &pattern,
@@ -49,10 +48,13 @@ class RadixTrie {
 	};
 
 	struct MemoryStats {
-		size_t total_bytes;
+		size_t total_bytes;		   // structs + every heap buffer requested
 		size_t node_count;
-		size_t string_bytes;
-		size_t overhead_bytes;
+		size_t string_bytes;	   // raw character payload (sum of key sizes)
+		size_t struct_bytes;	   // node_count * sizeof(RadixNode)
+		size_t child_buffer_bytes; // heap backing arrays for children vectors
+		size_t string_buffer_bytes; // heap for non-SSO key allocations
+		size_t overhead_bytes;	   // total_bytes - string_bytes
 		double bytes_per_word;
 	};
 
@@ -80,6 +82,7 @@ class RadixTrie {
 	size_t bulk_insert_from_file(const std::string &path,
 								 size_t buffer_size = 1024 * 1024);
 	size_t bulk_insert_from_buffer(const char *data, size_t length);
+	size_t bulk_remove_from_buffer(const char *data, size_t length);
 	std::string serialize_to_buffer() const;
 
 	HeightStats get_height_stats() const;

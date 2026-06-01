@@ -30,6 +30,7 @@ class Seshat : public Napi::ObjectWrap<Seshat> {
 	Napi::Value WordsWithPrefix(const Napi::CallbackInfo &info);
 	Napi::Value Remove(const Napi::CallbackInfo &info);
 	Napi::Value RemoveBatch(const Napi::CallbackInfo &info);
+	Napi::Value RemoveFromBuffer(const Napi::CallbackInfo &info);
 	Napi::Value Empty(const Napi::CallbackInfo &info);
 	Napi::Value Size(const Napi::CallbackInfo &info);
 	Napi::Value Clear(const Napi::CallbackInfo &info);
