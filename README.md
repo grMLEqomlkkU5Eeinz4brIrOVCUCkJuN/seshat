@@ -50,7 +50,7 @@ Honestly a little nervous about this, but there is a [Benchmarks results file](.
 
 ### Buffer format (used by `toBuffer`/`fromBuffer`/`insertFromBuffer`/`insertFromStream`)
 
-Newline-delimited UTF-8 text — the same format as the text files used by `insertFromFile`:
+Newline-delimited UTF-8 text, the same format as the text files used by `insertFromFile`:
 
 ```
 aa
