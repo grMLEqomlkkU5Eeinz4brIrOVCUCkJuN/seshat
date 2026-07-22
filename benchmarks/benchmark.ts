@@ -1,4 +1,14 @@
 import { Seshat } from "../lib/index";
+import * as fs from "fs";
+
+// Deterministic-ish random sample without replacement bias mattering for a bench.
+function sampleRandom<T>(items: T[], n: number): T[] {
+	const out: T[] = [];
+	for (let i = 0; i < n; i++) {
+		out.push(items[Math.floor(Math.random() * items.length)]);
+	}
+	return out;
+}
 
 interface BenchmarkResult {
 	test: string;
@@ -137,15 +147,18 @@ function runStableBenchmarks(): void {
 		trie.insert("testword");
 	}, 50, 15, 1000);
 
-	// Single search (existing)
+	// Depth-1 trie: isolates N-API round-trip cost with traversal held ~constant.
+	// This is NOT representative search throughput — it is the floor a caller can
+	// never beat. The gap between this and the corpus-backed numbers below is the
+	// actual trie-traversal cost. Kept (renamed) because it measures something real.
 	const setupTrie = new Seshat();
 	setupTrie.insert("testword");
-	coreBench.timeStable("Search (hit)", () => {
+	coreBench.timeStable("N-API floor (1-word trie)", () => {
 		setupTrie.search("testword");
 	}, 50, 15, 1000);
 
-	// Single search (miss)
-	coreBench.timeStable("Search (miss)", () => {
+	// Single search (miss) against the same depth-1 trie.
+	coreBench.timeStable("N-API floor miss (1-word)", () => {
 		setupTrie.search("missing");
 	}, 50, 15, 1000);
 
@@ -164,6 +177,45 @@ function runStableBenchmarks(): void {
 	}, 50, 15, 1000);
 
 	coreBench.printResults();
+
+	// Corpus-backed search: what a caller actually gets on a real, deep trie.
+	// Compare these against the "N-API floor" numbers above — the difference is
+	// the real cost of walking the trie rather than N-API overhead.
+	const corpusPath = "./textfiles/terms.txt";
+	if (fs.existsSync(corpusPath)) {
+		const corpusBench = new StableBenchmark("Corpus Search (real-world)");
+
+		const corpus = fs.readFileSync(corpusPath);
+		const words = corpus.toString("utf8").split("\n").filter(Boolean);
+		console.log(`\nLoading corpus: ${words.length.toLocaleString()} words...`);
+
+		const searchTrie = new Seshat();
+		searchTrie.insertFromBuffer(corpus);
+
+		const hits = sampleRandom(words, 10_000);
+		const deepMisses = hits.map((w) => w + "qxz");    // diverges late, near the leaf
+		const shallowMisses = hits.map((w) => "qxz" + w); // diverges at the root
+
+		let i = 0;
+		corpusBench.timeStable("Search hit", () => {
+			searchTrie.search(hits[i++ % hits.length]);
+		}, 50, 15, 1000);
+
+		let j = 0;
+		corpusBench.timeStable("Search miss, deep", () => {
+			searchTrie.search(deepMisses[j++ % deepMisses.length]);
+		}, 50, 15, 1000);
+
+		let k = 0;
+		corpusBench.timeStable("Search miss, shallow", () => {
+			searchTrie.search(shallowMisses[k++ % shallowMisses.length]);
+		}, 50, 15, 1000);
+
+		corpusBench.printResults();
+	} else {
+		console.log(`\nSkipping corpus search benchmark: ${corpusPath} not found.`);
+		console.log("Run 'npm run setupTextFiles' to fetch the corpus.");
+	}
 
 	// Batch operations benchmark
 	const batchBench = new StableBenchmark("Batch vs Individual");

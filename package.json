@@ -27,7 +27,8 @@
 		"setupTextFiles": "mkdir textfiles && cd textfiles && wget https://norvig.com/ngrams/enable1.txt && wget https://raw.githubusercontent.com/ScriptSmith/topwords/master/words.txt && wget https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/badwordslist/badwords.txt && wget https://raw.githubusercontent.com/grMLEqomlkkU5Eeinz4brIrOVCUCkJuN/terms.txt/refs/heads/master/terms.txt",
 		"prebuildify": "prebuildify --napi --strip",
 		"benchmark:filestream": "tsx benchmarks/filestream.ts",
-		"benchmark": "tsx benchmarks/benchmark.ts"
+		"benchmark": "tsx benchmarks/benchmark.ts",
+		"benchmark:gc": "tsx --expose-gc benchmarks/benchmark.ts"
 	},
 	"gypfile": true,
 	"keywords": [
