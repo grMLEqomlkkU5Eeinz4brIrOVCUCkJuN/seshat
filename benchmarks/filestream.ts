@@ -6,7 +6,7 @@ console.log("Seshat File-Streaming Benchmark");
 console.log("==============================");
 
 const filePath = "./textfiles/terms.txt";
-const bufferSize = 16 * 1024 * 1024; // 16MB buffer
+const bufferSize = 32 * 1024 * 1024; // 16MB buffer
 
 function formatBytes(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;
